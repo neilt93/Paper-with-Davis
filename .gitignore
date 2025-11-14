@@ -1,0 +1,13 @@
+# Ignore image files anywhere in the repo
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+
+# And ignore the Images directories explicitly
+Images/
+Images/**/*
+
+

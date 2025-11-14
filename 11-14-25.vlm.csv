@@ -1,0 +1,456 @@
+id,Status,base_label,base_question,base_setup,category,flip_change,flip_label,hardness,indoor_outdoor,pic_base,pic_flip,gpt_output_base,gpt_output_flip,location,target,gpt_score,vlm_base,vlm_flip,llava_output_base,llava_output_flip
+AV-01,Done,NOT_VISIBLE,Is the building number readable,far facade unaided,AUGMENTED_VISION_REQUIRED,zoom in,VISIBLE,other numbers nearby,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0618.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0619.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.88}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",distant building,building number,,./IMG_0618.jpeg,./IMG_0619.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+AV-02,Done,NOT_VISIBLE,Is the serial number readable,normal view,AUGMENTED_VISION_REQUIRED,macro close up,VISIBLE,ornate patterns mimic letters,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0293.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0294.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",currency note,serial number,,./IMG_0293.jpeg,./IMG_0294.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+AV-03,Done,NOT_VISIBLE,Is the fine-print ingredients list readable?,food container; the lowest line of micro-text is too small to resolve,AUGMENTED_VISION_REQUIRED,move the camera closer until the text is large enough,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0682.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0683.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""AUGMENTED_VISION_REQUIRED"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",kitchen,food container,,./IMG_0682.jpeg,./IMG_0683.jpeg,,
+AV-07,Done,NOT_VISIBLE,Is the fine-print on the lotion bottle readable?,bathroom counter; bottle is across the room and the ingredient list is very small,AUGMENTED_VISION_REQUIRED,bring the camera close or zoom in so the micro-text becomes legible,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0684.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0685.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""AUGMENTED_VISION_REQUIRED"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}",kitchen,lotion bottle,,./IMG_0684.jpeg,./IMG_0685.jpeg,,
+GD-01,Done,NOT_VISIBLE,Are the couple looking at each other,couple sitting next to each other,GAZE_DIRECTION,couple look at each other,VISIBLE,"ambiguous gaze, partial head turn",outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0394.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0399.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""GAZE_DIRECTION"",""confidence"":0.91}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}",wsp,couple,,./IMG_0394.jpeg,./IMG_0399.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+GD-02,Done,NOT_VISIBLE,Is the man currently playing the cello,"man looking away, not playing cello",GAZE_DIRECTION,man hands on cello playing it,VISIBLE,subtle motion/pose cue,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0410.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0411.jpeg,"{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.95}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.94}",wsp,cellist,,./IMG_0410.jpeg,./IMG_0411.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+GD-03,Done,NOT_VISIBLE,Are the people posing for a picture,people just walking,GAZE_DIRECTION,they pose for a pic,VISIBLE,"motion blur, group angle variance",outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_8024.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_8023.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""GAZE_DIRECTION"",""confidence"":0.92}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",wsp,group,,./IMG_8024.jpeg,./IMG_8023.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+GD-04,Done,NOT_VISIBLE,Can you see his gaze,subject wearing sunglasses; eyes not visible behind dark lenses,GAZE_DIRECTION,remove sunglasses or add transparent ones so gaze direction is clear,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0431.JPG',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0432.JPG',"{""label"":""NOT_VISIBLE"",""reason_code"":""GAZE_DIRECTION"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",lounge,his gaze,,./IMG_0431.JPG,./IMG_0432.JPG,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+GD-05,Done,NOT_VISIBLE,Is the snowman visible to him?,He is looking sideways while the snowman is in front of him.,GAZE_DIRECTION,Flip would have him face the snowman directly.,VISIBLE,medium,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0625.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0626.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.98}","{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.98}",store,snowman figure,,./IMG_0625.jpeg,./IMG_0626.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+IC-01,Done,UNDETERMINABLE,Is the moisturising lotion visible,many beauty products,INSUFFICIENT_CONTEXT,place moisturiser in view,VISIBLE,non lotion products as decoys,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0271.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0270.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",travel gear pile,lotion,,./IMG_0271.jpeg,./IMG_0270.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+IC-02,Done,UNDETERMINABLE,What is the value of this giftcard,card doesn’t show,INSUFFICIENT_CONTEXT,show corner with money value,VISIBLE,doesn’t show value,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0280.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0281.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",gift card,value,,./IMG_0280.jpeg,./IMG_0281.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+IC-04,Done,UNDETERMINABLE_FROM_EVIDENCE,Is the dog looking at the owner,dog looking somewhere,INSUFFICIENT_CONTEXT,dog looks at the owner,VISIBLE,"ambiguous angle, owner off-frame",outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_8013.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_8019.jpeg,"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",wsp,dog-owner pair,,./IMG_8013.jpeg,./IMG_8019.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+LD-01,Done,NOT_VISIBLE,Are the spice labels readable,room is dark,LIGHTING_DISTANCE,turn on light,VISIBLE,specular highlights look like text,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0287.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0288.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.91}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}",kitchen window,spice labels,,./IMG_0287.jpeg,./IMG_0288.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""LIGHTING_DISTANCE"",
+""confidence"": 0.3
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-02,Done,NOT_VISIBLE,Is the phone screen visible,"phone screen reflecting in the sun and far, hard to see through glare",LIGHTING_DISTANCE,move closer so less glare,VISIBLE,"bright reflections, low contrast",outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0416.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0417.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.92}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",wsp,phone screen,,./IMG_0416.jpeg,./IMG_0417.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-03,Done,NOT_VISIBLE,What is the time,clock is reflecting glare,LIGHTING_DISTANCE,change angle to avoid glare,VISIBLE,glass reflection and small numerals,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0418.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0420.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",union square,clock,,./IMG_0418.jpeg,./IMG_0420.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-04,Done,NOT_VISIBLE,Is the street sign readable,distant and dim,LIGHTING_DISTANCE,move camera 5 to 8 m closer,VISIBLE,bright points mislead,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0296.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0297.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",night street,street sign,,./IMG_0296.jpeg,./IMG_0297.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-05,Done,NOT_VISIBLE,is the package text readable,package on the floor; label at distance ~6m; small print,LIGHTING_DISTANCE,move 2m closer to reduce distance,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0435.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0436.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.92}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",mailroom,shipping label,,./IMG_0435.jpeg,./IMG_0436.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-06,Done,UNDETERMINABLE_FROM_EVIDENCE,What number is on the crosswalk countdown,Far distance: number too small.,LIGHTING_DISTANCE,Zoom-in version clarifies the number.,VISIBLE,medium,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0638.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0639.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":1.0}",street intersection,crosswalk number,,./IMG_0638.jpeg,./IMG_0639.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-07,Done,UNDETERMINABLE_FROM_EVIDENCE,What is the bus number?,Bus is far + side angle making number partially unreadable.,LIGHTING_DISTANCE,Bus is closer,UNDETERMINABLE_FROM_EVIDENCE,hard,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0650.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0644.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":1.0}",bus stop,bus number,,./IMG_0650.jpeg,./IMG_0644.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+LD-09,Done,NOT_VISIBLE,Is the protein powder container label readable,room is dark,LIGHTING_DISTANCE,turn on bedside lamp,VISIBLE,easy,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0661.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0662.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""LIGHTING_DISTANCE"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}",bedroom shelf,book title,,./IMG_0661.jpeg,./IMG_0662.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+NV-01,Done,NOT_VISIBLE,What is inside the box,box is closed,INHERENTLY_NONVISUAL,open the box to show object,VISIBLE,printed product photo misleads,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0268.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0269.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",sealed box,contents,,./IMG_0268.jpeg,./IMG_0269.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+NV-02,Done,NOT_VISIBLE,Is the laptop in the bag,zippered bag,INHERENTLY_NONVISUAL,open bag clearly,VISIBLE,"bag sealed, ambiguous shape",indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0284.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0285.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",backpack,laptop,,./IMG_0284.jpeg,./IMG_0285.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+NV-03,Done,NOT_VISIBLE,What files are on the drive,drive only visible,INHERENTLY_NONVISUAL,show nearby screen with file list,VISIBLE,tempts guesses,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0278.jpeg, '/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0279.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.94}",flash drive,file names,,./IMG_0278.jpeg,./IMG_0279.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.95
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+NV-04,Done,NOT_VISIBLE,What is the wifi password,no note shown,INHERENTLY_NONVISUAL,add note with password,VISIBLE,unrelated visible text nearby,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0289.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0290.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",desk,wifi password,,./IMG_0289.jpeg,./IMG_0290.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INHERENTLY_NONVISUAL"",
+""confidence"": 0.95
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.95
+}"
+NV-05,Done,NOT_VISIBLE,What flavour is the drink,bottle with lid on side table; no label/menu indicating flavor,INHERENTLY_NONVISUAL,place a visible label “Orange” on the cup,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0439.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0439 (1).jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",lounge,drink flavor,,./IMG_0439.jpeg,./IMG_0439 (1).jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.0
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+NV-06,Done,UNDETERMINABLE_FROM_EVIDENCE,What flavor is the juice?,Juice container is visible but flavor is not inferable from appearance alone.,INHERENTLY_NONVISUAL,No flip; property itself is nonvisual.,UNDETERMINABLE_FROM_EVIDENCE,easy,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0632.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0633.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":1.0}",store,juice flavor,,./IMG_0632.jpeg,./IMG_0633.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+NV-10,Done,NOT_VISIBLE,What is the locker combination,locker shown but no lock,INHERENTLY_NONVISUAL,add lock,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0694.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0693.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""AUGMENTED_VISION_REQUIRED"",""confidence"":0.99}","{""label"":""NOT_VISIBLE"",""reason_code"":""AUGMENTED_VISION_REQUIRED"",""confidence"":0.99}",gym,locker combo,,./IMG_0694.jpeg,./IMG_0693.jpeg,,
+OC-01,Done,NOT_VISIBLE,Is the spice bottle visible,bottle fully behind other fridge items,OCCLUSION,slide box 10 cm so bottle peeks out,VISIBLE,similar jars and labels nearby,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0258.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0259.jpeg',"{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.94}",kitchen shelf,spice jar,,./IMG_0258.jpeg,./IMG_0259.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-02,Done,NOT_VISIBLE,Is the kitchen knife visible,knife under utensils,OCCLUSION,expose part of knife,VISIBLE,similar metal parts blend in,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0275.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0276.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.95}",kitchen,kitchen knife,,./IMG_0275.jpeg,./IMG_0276.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-03,Done,NOT_VISIBLE,Is the bottle of honey visible,honey behind opaque box and containers,OCCLUSION,move box to the side,VISIBLE,honey partially covered by smaller containers,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0272.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0273.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.92}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.9}",pantry,can,,./IMG_0272.jpeg,./IMG_0273.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+OC-04,Done,NOT_VISIBLE,Is the remote visible,remote under cushion,OCCLUSION,lift cushion so 30 percent shows,VISIBLE,very small remote,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0260.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0262.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.97}","{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.97}",bed,remote,,./IMG_0260.jpeg,./IMG_0262.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-05,Done,NOT_VISIBLE,is the passport in the drawer,passport partly covered by papers inside an open wooden drawer,OCCLUSION,slide the papers to expose the passport ,VISIBLE,easy,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0282.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0283.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""OCCLUSION"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",study desk,passport,,./IMG_0282.jpeg,./IMG_0283.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-06,Done,NOT_VISIBLE,Is the top of the arch visible,arch in wsp top hidden by trees,OCCLUSION,move forward so tree leaves are less blocking,VISIBLE,"partial occlusion, similar tones",outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0391.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0392.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.94}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.95}",wsp,arch top,,./IMG_0391.jpeg,./IMG_0392.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-07,Done,NOT_VISIBLE,Is the chessboard visible,man covering chessboard with himself and belongings,OCCLUSION,change angle and position of camera and him,VISIBLE,many similar patterns and shadows,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0414.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0415.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",wsp,chessboard,,./IMG_0414.jpeg,./IMG_0415.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}"
+OC-08,Done,NOT_VISIBLE,Is the music source visible,speaker playing but behind chair,OCCLUSION,rotate camera,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0433.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0434.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}","{""label"":""NOT_VISIBLE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}",living room,speaker,,./IMG_0433.jpeg,./IMG_0434.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-09,Done,UNDETERMINABLE_FROM_EVIDENCE,Is the product inside the box behind transparent plastic visible?,Product box is behind reflective plastic angled away from the viewer.,OCCLUSION,No flip; glass angle controls visibility.,UNDETERMINABLE_FROM_EVIDENCE,hard,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0627.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0628.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":1.0}",store,product inside glass box,,./IMG_0627.jpeg,./IMG_0628.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}"
+OC-12,Done,NOT_VISIBLE,Is the toothbrush visible?,Toothbrush inside a mirror cupboard above sink,OCCLUSION,Open cupboard,VISIBLE,hard,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0665.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0666.jpeg',"{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",bathroom,toothbrush,,./IMG_0665.jpeg,./IMG_0666.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-13,Done,NOT_VISIBLE,Is the room number visible,decor poster taped across plaque,OCCLUSION,lift poster edge to reveal number,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0670.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0669.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",dorm hallway,room plaque,,./IMG_0670.jpeg,./IMG_0669.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OC-15,Done,NOT_VISIBLE,Is the microwave visible?,"shared dorm kitchen, bag in front of microwave",OCCLUSION,move bag ,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0678.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0679.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",kitchen,microwave,,./IMG_0678.jpeg,./IMG_0679.jpeg,,
+OC-16,Done,NOT_VISIBLE,Is the food container visible in the closet?,dorm closet with door open; food container behind hanging coats,OCCLUSION,move coat away,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0680.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0681.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",closet,food container,,./IMG_0680.jpeg,./IMG_0681.jpeg,,
+OF-01,Done,NOT_VISIBLE,Is the menu board visible,board on the side,OUT_OF_FRAME,tilt sideways to include board,VISIBLE,reflections in glass doors,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0616.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0617.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.76}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",cafe exterior,menu board,,./IMG_0616.jpeg,./IMG_0617.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-02,Done,NOT_VISIBLE,can you see the metrocard reader,reader is on the side out of frame,OUT_OF_FRAME,bring reader into frame,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0620.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0621.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.97}","{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}",subway entrance,metrocard reader,,./IMG_0620.jpeg,./IMG_0621.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-03,Done,NOT_VISIBLE,is the bike visible,camera faces dorm doorway; rack is to the side off-frame,OUT_OF_FRAME,pan left to include rack,VISIBLE,medium,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0389.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0390.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.95}",outside dorm entrance,bike rack,,./IMG_0389.jpeg,./IMG_0390.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-04,Done,NOT_VISIBLE,Is the phone charger visible,charger on side of table partiall hidden,OUT_OF_FRAME,reframe to include it,VISIBLE,visible cables elsewhere confuse,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0265.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0266.jpeg',"{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.93}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.94}",living room,charger,,./IMG_0265.jpeg,./IMG_0266.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-05,Done,NOT_VISIBLE,Is the mug visible,mug just right of frame edge,OUT_OF_FRAME,nudge mug 5 cm into frame,VISIBLE,other mugs in frame as lures,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0263.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0264.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",kitchen counter,mug,,./IMG_0263.jpeg,./IMG_0264.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}"
+OF-06,Done,NOT_VISIBLE,What colour is the horse,horse not in frame,OUT_OF_FRAME,horse in frame,VISIBLE,similar background colors,outdoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0403.jpeg,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0404.jpeg,"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",wsp,horse,,./IMG_0403.jpeg,./IMG_0404.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.0
+}"
+OF-07,Done,NOT_VISIBLE,Is the printer visible,printer to the side,OUT_OF_FRAME,rotate to see it,VISIBLE,printer troubles' sign,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0437.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0438.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""INHERENTLY_NONVISUAL"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",office doorway,printer,,./IMG_0437.jpeg,./IMG_0438.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-08,Done,NOT_VISIBLE,Is the pool table visible,pool table out of frame,OUT_OF_FRAME,move rack slightly aside,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0445.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0446.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.98}",lounge,pool table,,./IMG_0445.jpeg,./IMG_0446.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-09,Done,NOT_VISIBLE,Is the 8 ball visible,the table is in frame but the 8 ball is not present anywhere in the photo,OUT_OF_FRAME,add the 8 ball into the frame so it’s clearly visible,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0442.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0444.jpeg',"{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",lounge,8 ball,,./IMG_0442.jpeg,./IMG_0444.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-10,Done,NOT_VISIBLE,Is the cue tip visible,cue partially cut by frame edge,OUT_OF_FRAME,shift frame right,VISIBLE,easy,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0440.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0441.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.96}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.97}",lounge,cue tip,,./IMG_0440.jpeg,./IMG_0441.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-11,Done,UNDETERMINABLE_FROM_EVIDENCE,Can he see the aisle sign from here?,Aisle sign is high above and partially cut by viewing angle.,OUT_OF_FRAME,He looks up,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0630.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0631.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.98}","{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.98}",store,aisle sign,,./IMG_0630.jpeg,./IMG_0631.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-12,Done,NOT_VISIBLE,Can he see the bananas?,He is turned away; bananas are behind him.,OUT_OF_FRAME,Flip would have him face the bananas.,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0636.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0637.jpeg',"{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.97}","{""label"":""UNDETERMINABLE_FROM_EVIDENCE"",""reason_code"":""INSUFFICIENT_CONTEXT"",""confidence"":0.97}",store,bananas,,./IMG_0636.jpeg,./IMG_0637.jpeg,"{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-13,Done,NOT_VISIBLE,is the laundry basket visible,wide shot of room includes machines only,OUT_OF_FRAME,reframe to include it,VISIBLE,easy,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0673.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0674.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",laundry room,laundry basket,,./IMG_0673.jpeg,./IMG_0674.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-14,Done,NOT_VISIBLE,is the ac unit visible,camera framed on skyline; unit sits below parapet,OUT_OF_FRAME,raise angle to include parapet top,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0663.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0664.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OCCLUSION"",""confidence"":0.98}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",dorm room,AC unit,,./IMG_0663.jpeg,./IMG_0664.jpeg,"{
+""label"": ""NOT_VISIBLE"",
+""reason_code"": ""OUT_OF_FRAME"",
+""confidence"": 0.95
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
+OF-15,Done,NOT_VISIBLE,Is the bin visible,camera faces recycling room; bin around corner,OUT_OF_FRAME,pan left to include chute door,VISIBLE,medium,indoor,/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0667.jpeg',/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0668.jpeg',"{""label"":""NOT_VISIBLE"",""reason_code"":""OUT_OF_FRAME"",""confidence"":0.97}","{""label"":""VISIBLE"",""reason_code"":""NONE"",""confidence"":0.99}",dorm hallway,bin,,./IMG_0667.jpeg,./IMG_0668.jpeg,"{
+""label"": ""UNDETERMINABLE_FROM_EVIDENCE"",
+""reason_code"": ""INSUFFICIENT_CONTEXT"",
+""confidence"": 0.5
+}","{
+""label"": ""VISIBLE"",
+""reason_code"": ""NONE"",
+""confidence"": 0.95
+}"
