@@ -34,6 +34,24 @@ Rules:
 Question: {question}"""
 
 
+def normalize_question(text: str) -> str:
+    """
+    Light normalization of the base_question text:
+      - strip whitespace
+      - capitalize first character
+      - ensure trailing '?'
+    """
+    t = text.strip()
+    if not t:
+        return t
+    # Capitalize first non-space char
+    t = t[0].upper() + t[1:]
+    # Ensure it ends with '?'
+    if not t.endswith("?"):
+        t = t.rstrip(".! ") + "?"
+    return t
+
+
 def resolve_image_path(raw_path: str) -> Optional[str]:
     """
     Prefer the original absolute path if it exists; otherwise try common local
@@ -65,6 +83,18 @@ def resolve_image_path(raw_path: str) -> Optional[str]:
             return candidate
 
     return None
+
+
+def load_table(path: str) -> pd.DataFrame:
+    """
+    Load either CSV or Excel based on file extension.
+    """
+    ext = os.path.splitext(path.lower())[1]
+    if ext in {".xlsx", ".xls"}:
+        return pd.read_excel(path)
+    if ext == ".csv":
+        return pd.read_csv(path)
+    raise ValueError(f"Unsupported input extension: {ext}")
 
 
 # ----------------- Model adapters -----------------
@@ -105,7 +135,8 @@ class GPTAdapter(BaseAdapter):
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                    # Responses API expects image_url to be a string URL, not an object
+                    {"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}"},
                 ],
             }
         ]
@@ -245,9 +276,9 @@ def main():
         sys.exit(1)
 
     try:
-        df = pd.read_csv(args.input)
+        df = load_table(args.input)
     except Exception as e:
-        print(f"[ERROR] Failed to read CSV '{args.input}': {e}", file=sys.stderr)
+        print(f"[ERROR] Failed to read table '{args.input}': {e}", file=sys.stderr)
         sys.exit(1)
 
     required_cols = {"id", "Status", "pic_base", "pic_flip", "base_question"}
@@ -256,42 +287,94 @@ def main():
         print(f"[ERROR] Missing required columns: {', '.join(sorted(missing))}", file=sys.stderr)
         sys.exit(1)
 
+    total_rows = len(df)
     df_done = df[df["Status"] == "Done"].copy()
+    done_rows = len(df_done)
     if df_done.empty:
         print("[ERROR] No rows with Status == 'Done' in input.", file=sys.stderr)
         sys.exit(1)
+
+    print(f"[INFO] Filtering rows: total={total_rows} done={done_rows}", file=sys.stderr)
 
     df_done = df_done.sort_values("id")
 
     base_out: List[str] = []
     flip_out: List[str] = []
 
+    processed_rows = 0
+    skipped_rows = 0
+    skipped_base = 0
+    skipped_flip = 0
+
     for _, row in df_done.iterrows():
-        q = row["base_question"]
-        q_text = "" if not isinstance(q, str) else q.strip()
+        row_id = str(row["id"])
+        raw_q = row["base_question"]
+        q_text = "" if not isinstance(raw_q, str) else normalize_question(str(raw_q))
+
+        # Pre-check: question present
+        if not q_text:
+            print(
+                f"[SKIP] id={row_id} reason=missing_or_empty_base_question",
+                file=sys.stderr,
+            )
+            base_out.append("")
+            flip_out.append("")
+            skipped_rows += 1
+            continue
+
         full_prompt = PROMPT_TEMPLATE.format(question=q_text)
+
+        base_name = os.path.basename(str(row["pic_base"]))
+        flip_name = os.path.basename(str(row["pic_flip"]))
+
+        print(
+            f"[RUN] model={args.model} id={row_id} "
+            f"base={base_name} flip={flip_name} "
+            f"question={q_text}",
+            file=sys.stderr,
+        )
 
         # base
         base_path = resolve_image_path(row["pic_base"])
         if base_path is None:
+            print(
+                f"[WARN] id={row_id} which=base reason=image_not_found raw_path={row['pic_base']}",
+                file=sys.stderr,
+            )
             base_out.append("")
+            skipped_base += 1
         else:
             try:
                 resp = adapter.answer(base_path, full_prompt)
                 base_out.append(resp.raw_text)
             except Exception as e:
+                print(
+                    f"[ERROR] id={row_id} which=base reason=model_error msg={e}",
+                    file=sys.stderr,
+                )
                 base_out.append(f"ERROR: {e}")
 
         # flip
         flip_path = resolve_image_path(row["pic_flip"])
         if flip_path is None:
+            print(
+                f"[WARN] id={row_id} which=flip reason=image_not_found raw_path={row['pic_flip']}",
+                file=sys.stderr,
+            )
             flip_out.append("")
+            skipped_flip += 1
         else:
             try:
                 resp = adapter.answer(flip_path, full_prompt)
                 flip_out.append(resp.raw_text)
             except Exception as e:
+                print(
+                    f"[ERROR] id={row_id} which=flip reason=model_error msg={e}",
+                    file=sys.stderr,
+                )
                 flip_out.append(f"ERROR: {e}")
+
+        processed_rows += 1
 
     col_base = f"{args.model}_base_json"
     col_flip = f"{args.model}_flip_json"
@@ -304,12 +387,21 @@ def main():
         out_path = f"{base}.{args.model}.vlm.csv"
 
     try:
-        df_done.to_csv(out_path, index=False)
+        out_ext = os.path.splitext(out_path.lower())[1]
+        if out_ext in {".xlsx", ".xls"}:
+            df_done.to_excel(out_path, index=False)
+        else:
+            df_done.to_csv(out_path, index=False)
     except Exception as e:
-        print(f"[ERROR] Failed to write output CSV '{out_path}': {e}", file=sys.stderr)
+        print(f"[ERROR] Failed to write output table '{out_path}': {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"[INFO] Saved model outputs to: {out_path}")
+    print(
+        f"[INFO] Done. saved={out_path} "
+        f"processed_rows={processed_rows} skipped_rows={skipped_rows} "
+        f"skipped_base={skipped_base} skipped_flip={skipped_flip}",
+        file=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

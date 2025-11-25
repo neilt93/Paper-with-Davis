@@ -1,36 +1,60 @@
-## Visibility Evaluation Artifact
+## Visibility evaluation scripts
 
-This directory contains the **paper artifact code**:
+Working scripts in this repo:
 
-- `vlm_inference.py` – run `lmms-lab/LLaVA-OneVision-1.5-4B-Instruct` over your CSV, build `vlm_base` / `vlm_flip` paths, and store JSON outputs.
-- `evaluate_gpt_visibility.py` – compute GPT-based visibility metrics from a CSV and print markdown tables.
-- `visibility_eval/` – minimal, model-agnostic evaluation harness (dummy model by default).
-- `visibility_samples.jsonl` – tiny example dataset for the harness.
- - `run_visibility_eval.py` – unified runner that takes a CSV + model name (API or local HF) and generates per-image JSON predictions.
+- `run_visibility_eval.py` – unified runner that takes a CSV + model name (API or local HF) and generates per-image JSON predictions.
+- `vlm_inference.py` – earlier LLaVA-only local inference script.
+- `evaluate_gpt_visibility.py` – compute GPT-based visibility metrics from a CSV that already has `gpt_output_*` columns.
 
-### Running the scripts
+### Expected CSV format for `run_visibility_eval.py`
+
+The input CSV (e.g. `Sheets/11-14-25.csv`) should have at least:
+
+- `id` – row identifier (e.g. `AV-01`).
+- `Status` – only rows with `Status == "Done"` are evaluated.
+- `pic_base`, `pic_flip` – original image paths (can be absolute like `/Users/.../Images/IMG_0394.jpeg`).
+- `base_question` – the natural-language question for that pair.
+
+**Image path preprocessing**:
+
+- For each `pic_base` / `pic_flip`, the script:
+  - strips quotes and whitespace,
+  - takes just the **filename** (e.g. `IMG_0394.jpeg` from `/Users/.../Images/IMG_0394.jpeg`),
+  - looks for the file under (in order):
+    - `./Images/Images/<filename>`
+    - `./Images/<filename>`
+    - `./Images Sheet Versions/<filename>`
+    - `./<filename>`
+- This lets you keep absolute macOS-style paths in the sheet while running the eval on Windows; only the filename matters.
+
+### Running `run_visibility_eval.py`
 
 From the repo root:
 
 ```bash
-# Local LLaVA-style inference on your CSV
-python artifact/vlm_inference.py --input "11-14-25.csv"
+# You can point directly at either CSV or Excel:
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt
+python run_visibility_eval.py --input "Sheets/11-14-25.xlsx" --model gpt
 
-# GPT visibility metrics over a CSV that already has gpt_output_* columns
-python artifact/evaluate_gpt_visibility.py --input "11-14-25.vlm.csv"
-
-# Minimal dummy harness example
-python -m artifact.visibility_eval.cli --dataset artifact/visibility_samples.jsonl --model dummy
-
-# Unified runner: CSV + model name -> predictions
 # API models (need env vars like OPENAI_API_KEY / GEMINI_API_KEY)
-python artifact/run_visibility_eval.py --input "11-14-25.csv" --model gpt
-python artifact/run_visibility_eval.py --input "11-14-25.csv" --model gemini
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gemini
 
 # Local HF models (either friendly name or raw repo id)
-python artifact/run_visibility_eval.py --input "11-14-25.csv" --model llava-onevision
-python artifact/run_visibility_eval.py --input "11-14-25.csv" --model qwen-vl
-python artifact/run_visibility_eval.py --input "11-14-25.csv" --model idefics2
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model llava-onevision
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model qwen-vl
+python run_visibility_eval.py --input "Sheets/11-14-25.csv" --model idefics2
+```
+
+By default, the script creates a **CSV** next to the input, named `<input_basename>.<model>.vlm.csv`, with two new columns:
+
+- `<model>_base_json`
+- `<model>_flip_json`
+
+If you want an Excel file instead, pass an `.xlsx` path to `--out`, for example:
+
+```bash
+python run_visibility_eval.py --input "Sheets/11-14-25.xlsx" --model gpt --out "Sheets/11-14-25.gpt.vlm.xlsx"
 ```
 
 
