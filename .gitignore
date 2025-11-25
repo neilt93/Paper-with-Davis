@@ -10,4 +10,7 @@
 Images/
 Images/**/*
 
-
+# Local secrets / config
+.env
+env.local
+*.env
