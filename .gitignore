@@ -14,3 +14,39 @@ Images/**/*
 .env
 env.local
 *.env
+
+# Credentials (service accounts, API keys, etc.)
+creds/
+creds/*.json
+
+# Python cache / build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+Sheets/**/*.csv
+Sheets/**/*.xlsx
+Sheets/**/*.json
+Sheets/**/*.txt
+Sheets/**/*.log
+Sheets/**/*.err
+Sheets/**/*.out
+Sheets/**/*.err.log
+Sheets/**/*.out.log
+Sheets/**/*.err.log.gz
+Sheets/**/*.out.log.gz

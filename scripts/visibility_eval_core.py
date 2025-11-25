@@ -1,4 +1,16 @@
-import argparse
+"""Core visibility evaluation logic shared by local and cloud entrypoints.
+
+This module knows how to:
+  - normalize questions
+  - resolve image paths into your local Images/ folder
+  - talk to different VLM backends (OpenAI, Gemini, local HF)
+  - fill <model>_base_json / <model>_flip_json for Status == 'Done' rows
+
+Entry scripts like `scripts/local/run_visibility_eval.py` and
+`scripts/cloud/*` should call into `run_on_dataframe` rather than
+reimplementing the logic.
+"""
+
 import os
 import sys
 from dataclasses import dataclass
@@ -44,9 +56,7 @@ def normalize_question(text: str) -> str:
     t = text.strip()
     if not t:
         return t
-    # Capitalize first non-space char
     t = t[0].upper() + t[1:]
-    # Ensure it ends with '?'
     if not t.endswith("?"):
         t = t.rstrip(".! ") + "?"
     return t
@@ -97,8 +107,6 @@ def load_table(path: str) -> pd.DataFrame:
     raise ValueError(f"Unsupported input extension: {ext}")
 
 
-# ----------------- Model adapters -----------------
-
 @dataclass
 class ModelResponse:
     raw_text: str
@@ -135,7 +143,6 @@ class GPTAdapter(BaseAdapter):
                 "role": "user",
                 "content": [
                     {"type": "input_text", "text": prompt},
-                    # Responses API expects image_url to be a string URL, not an object
                     {"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}"},
                 ],
             }
@@ -233,7 +240,6 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in {"gemini", "gemini-1.5"}:
         return GeminiAdapter(model="gemini-1.5-pro")
 
-    # Three suggested local vision models (you can tweak these IDs):
     hf_map = {
         "llava-onevision": "lmms-lab/LLaVA-OneVision-1.5-4B-Instruct",
         "qwen-vl": "Qwen/Qwen2.5-VL-7B-Instruct",
@@ -242,83 +248,71 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in hf_map:
         return LocalHFAdapter(hf_map[name])
 
-    # Otherwise, treat `model_name` as a raw HF repo id for a local model
     return LocalHFAdapter(model_name)
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run visibility eval for a CSV against a VLM (API or local)."
-    )
-    parser.add_argument("--input", "-i", required=True, help="Input CSV with visibility dataset.")
-    parser.add_argument(
-        "--model",
-        "-m",
-        required=True,
-        help="Model name: e.g. gpt, gemini, llava-onevision, qwen-vl, or a HF repo id for local.",
-    )
-    parser.add_argument(
-        "--out",
-        "-o",
-        default=None,
-        help="Output CSV path (default: <input_basename>.<model>.vlm.csv)",
-    )
-    args = parser.parse_args()
+def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = False) -> pd.DataFrame:
+    """
+    Core evaluation logic:
+      - filter to Status == 'Done'
+      - normalize questions
+      - resolve image paths
+      - call the chosen model adapter
+      - fill <model>_base_json / <model>_flip_json
 
-    if not os.path.exists(args.input):
-        print(f"[ERROR] Input file not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        adapter = get_adapter(args.model)
-    except Exception as e:
-        print(f"[ERROR] Failed to initialize model adapter for '{args.model}': {e}", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        df = load_table(args.input)
-    except Exception as e:
-        print(f"[ERROR] Failed to read table '{args.input}': {e}", file=sys.stderr)
-        sys.exit(1)
-
+    Returns a new DataFrame with only the 'Done' rows and the new columns attached.
+    """
     required_cols = {"id", "Status", "pic_base", "pic_flip", "base_question"}
     missing = required_cols - set(df.columns)
     if missing:
-        print(f"[ERROR] Missing required columns: {', '.join(sorted(missing))}", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError(f"Missing required columns: {', '.join(sorted(missing))}")
 
     total_rows = len(df)
     df_done = df[df["Status"] == "Done"].copy()
     done_rows = len(df_done)
     if df_done.empty:
-        print("[ERROR] No rows with Status == 'Done' in input.", file=sys.stderr)
-        sys.exit(1)
+        raise ValueError("No rows with Status == 'Done' in input.")
 
     print(f"[INFO] Filtering rows: total={total_rows} done={done_rows}", file=sys.stderr)
 
     df_done = df_done.sort_values("id")
 
-    base_out: List[str] = []
-    flip_out: List[str] = []
+    col_base = f"{model_name}_base_json"
+    col_flip = f"{model_name}_flip_json"
+
+    if col_base not in df_done.columns:
+        df_done[col_base] = ""
+    if col_flip not in df_done.columns:
+        df_done[col_flip] = ""
+
+    adapter = get_adapter(model_name)
 
     processed_rows = 0
     skipped_rows = 0
     skipped_base = 0
     skipped_flip = 0
 
-    for _, row in df_done.iterrows():
+    for idx, row in df_done.iterrows():
         row_id = str(row["id"])
         raw_q = row["base_question"]
         q_text = "" if not isinstance(raw_q, str) else normalize_question(str(raw_q))
 
-        # Pre-check: question present
+        existing_base = str(row.get(col_base, "") or "")
+        existing_flip = str(row.get(col_flip, "") or "")
+
+        if only_missing and existing_base.strip() and existing_flip.strip():
+            print(
+                f"[SKIP] id={row_id} reason=already_has_{col_base}_and_{col_flip}",
+                file=sys.stderr,
+            )
+            skipped_rows += 1
+            continue
+
         if not q_text:
             print(
                 f"[SKIP] id={row_id} reason=missing_or_empty_base_question",
                 file=sys.stderr,
             )
-            base_out.append("")
-            flip_out.append("")
             skipped_rows += 1
             continue
 
@@ -328,7 +322,7 @@ def main():
         flip_name = os.path.basename(str(row["pic_flip"]))
 
         print(
-            f"[RUN] model={args.model} id={row_id} "
+            f"[RUN] model={model_name} id={row_id} "
             f"base={base_name} flip={flip_name} "
             f"question={q_text}",
             file=sys.stderr,
@@ -341,18 +335,17 @@ def main():
                 f"[WARN] id={row_id} which=base reason=image_not_found raw_path={row['pic_base']}",
                 file=sys.stderr,
             )
-            base_out.append("")
             skipped_base += 1
         else:
             try:
                 resp = adapter.answer(base_path, full_prompt)
-                base_out.append(resp.raw_text)
+                df_done.at[idx, col_base] = resp.raw_text
             except Exception as e:
                 print(
                     f"[ERROR] id={row_id} which=base reason=model_error msg={e}",
                     file=sys.stderr,
                 )
-                base_out.append(f"ERROR: {e}")
+                df_done.at[idx, col_base] = f"ERROR: {e}"
 
         # flip
         flip_path = resolve_image_path(row["pic_flip"])
@@ -361,50 +354,26 @@ def main():
                 f"[WARN] id={row_id} which=flip reason=image_not_found raw_path={row['pic_flip']}",
                 file=sys.stderr,
             )
-            flip_out.append("")
             skipped_flip += 1
         else:
             try:
                 resp = adapter.answer(flip_path, full_prompt)
-                flip_out.append(resp.raw_text)
+                df_done.at[idx, col_flip] = resp.raw_text
             except Exception as e:
                 print(
                     f"[ERROR] id={row_id} which=flip reason=model_error msg={e}",
                     file=sys.stderr,
                 )
-                flip_out.append(f"ERROR: {e}")
+                df_done.at[idx, col_flip] = f"ERROR: {e}"
 
         processed_rows += 1
 
-    col_base = f"{args.model}_base_json"
-    col_flip = f"{args.model}_flip_json"
-    df_done[col_base] = base_out
-    df_done[col_flip] = flip_out
-
-    out_path = args.out
-    if out_path is None:
-        base, ext = os.path.splitext(args.input)
-        out_path = f"{base}.{args.model}.vlm.csv"
-
-    try:
-        out_ext = os.path.splitext(out_path.lower())[1]
-        if out_ext in {".xlsx", ".xls"}:
-            df_done.to_excel(out_path, index=False)
-        else:
-            df_done.to_csv(out_path, index=False)
-    except Exception as e:
-        print(f"[ERROR] Failed to write output table '{out_path}': {e}", file=sys.stderr)
-        sys.exit(1)
-
     print(
-        f"[INFO] Done. saved={out_path} "
-        f"processed_rows={processed_rows} skipped_rows={skipped_rows} "
-        f"skipped_base={skipped_base} skipped_flip={skipped_flip}",
+        f"[INFO] Core eval complete: processed_rows={processed_rows} "
+        f"skipped_rows={skipped_rows} skipped_base={skipped_base} skipped_flip={skipped_flip}",
         file=sys.stderr,
     )
 
-
-if __name__ == "__main__":
-    main()
+    return df_done
 
 

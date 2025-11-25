@@ -1,3 +1,10 @@
+"""Compute GPT visibility metrics from a CSV and print markdown tables.
+
+This is your original GPT-only scoring script, left mostly unchanged.
+It expects columns like gpt_output_base / gpt_output_flip and produces
+overall metrics plus a per-row gpt_score column.
+"""
+
 import argparse
 import json
 import os

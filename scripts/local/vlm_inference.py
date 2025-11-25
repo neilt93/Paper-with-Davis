@@ -1,3 +1,10 @@
+"""Standalone script for running a single local HF VLM (like LLaVA-OneVision)
+over your CSV/Excel and printing a simple markdown table plus JSON outputs.
+
+This is mostly a legacy helper now that `scripts/local/run_visibility_eval.py`
+exists, but it can be handy for quick local-only experiments.
+"""
+
 import argparse
 import os
 import sys
