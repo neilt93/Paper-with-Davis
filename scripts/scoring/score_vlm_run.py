@@ -90,30 +90,57 @@ def _strip_code_fences(text: str) -> str:
     return text.strip()
 
 
-def _find_first_json_object(text: str) -> Optional[str]:
-    """Best-effort extraction of the first {...} JSON object in a string."""
+def _find_best_json_object(text: str) -> Optional[str]:
+    """
+    Best-effort extraction of a JSON object in a string.
+
+    Many local VLMs (e.g. LLaVA) echo the full chat transcript, including the
+    prompt's example JSON schema. The *first* `{...}` block is often NOT the
+    model's final answer. Here we scan for balanced `{...}` blocks and return
+    the *last* one that parses as JSON and contains a usable answer dict
+    (i.e. has a `label` field, possibly nested under common wrapper keys).
+    """
     if not text:
         return None
 
-    # Quick path: starts with { and ends with }
     t = text.strip()
-    if t.startswith("{") and t.endswith("}"):
-        return t
-
-    # Otherwise scan for a balanced object
-    start = t.find("{")
-    if start == -1:
+    if not t:
         return None
 
+    # Fast path: if the whole string is a JSON object and looks usable, keep it.
+    if t.startswith("{") and t.endswith("}"):
+        try:
+            obj = json.loads(t)
+            obj = _maybe_unwrap(obj)
+            if isinstance(obj, dict) and ("label" in obj):
+                return t
+        except Exception:
+            pass
+
+    last_good: Optional[str] = None
+    start: Optional[int] = None
     depth = 0
-    for i in range(start, len(t)):
-        if t[i] == "{":
-            depth += 1
-        elif t[i] == "}":
-            depth -= 1
+
+    for i, ch in enumerate(t):
+        if ch == "{":
             if depth == 0:
-                return t[start : i + 1]
-    return None
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    candidate = t[start : i + 1]
+                    try:
+                        obj = json.loads(candidate)
+                        obj = _maybe_unwrap(obj)
+                        if isinstance(obj, dict) and ("label" in obj):
+                            last_good = candidate
+                    except Exception:
+                        pass
+                    start = None
+
+    return last_good
 
 
 def _maybe_unwrap(obj: Any) -> Any:
@@ -138,7 +165,7 @@ def extract_json_fields(raw: Any) -> Tuple[Optional[str], Optional[float], Optio
     if not text:
         return None, None, None
 
-    candidate = _find_first_json_object(text)
+    candidate = _find_best_json_object(text)
     if candidate is None:
         # As a fallback try to parse the entire thing
         candidate = text
@@ -216,9 +243,7 @@ def main() -> None:
     model = args.model
     side = args.side
 
-    # XOR gold is fixed in this dataset (BASE is always NOT_VISIBLE), so `base_label`
-    # is optional. If present and binary, we still support it; otherwise we default
-    # to NOT_VISIBLE.
+    # XOR gold is fixed in this dataset: BASE is always NOT_VISIBLE.
 
     # XOR mode: explode 4 cells per family
     if "id" not in df.columns and "ID" in df.columns:
@@ -241,17 +266,8 @@ def main() -> None:
         )
         sys.exit(1)
 
-    def xor_gold_from_base(base_label: Any) -> Dict[str, str]:
-        """
-        XOR gold mapping.
-
-        Default assumption: BASE is always NOT_VISIBLE (so flips are VISIBLE and double-flip returns to NOT_VISIBLE).
-        If a binary `base_label` is present (VISIBLE/NOT_VISIBLE), we respect it.
-        """
-        b = _normalise_label(base_label)
-        if b == "VISIBLE":
-            return {"BASE": "VISIBLE", "TEXT_FLIP": "NOT_VISIBLE", "IMAGE_FLIP": "NOT_VISIBLE", "DOUBLE_FLIP": "VISIBLE"}
-        # Default / fallback: NOT_VISIBLE
+    def xor_gold_fixed() -> Dict[str, str]:
+        """Fixed XOR gold mapping for this dataset."""
         return {"BASE": "NOT_VISIBLE", "TEXT_FLIP": "VISIBLE", "IMAGE_FLIP": "VISIBLE", "DOUBLE_FLIP": "NOT_VISIBLE"}
 
     # Restrict to Done families for scoring.
@@ -307,7 +323,7 @@ def main() -> None:
             if missing_conf_answered:
                 missing_conf_answered_by_rel[rel] += 1
 
-        golds = xor_gold_from_base(row.get("base_label") if "base_label" in row else None)
+        golds = xor_gold_fixed()
 
         # Family completeness is defined only for families that are eligible for XOR gold.
         if all(parsed_labels[rel] is not None for rel in ("BASE", "TEXT_FLIP", "IMAGE_FLIP")):
@@ -333,7 +349,31 @@ def main() -> None:
                 }
             )
 
-    items_df = pd.DataFrame(rows_long)
+    items_df = pd.DataFrame(
+        rows_long,
+        columns=[
+            "family_id",
+            "is_second_order_tom",
+            "variant_relation",
+            "gold_label",
+            "pred_label",
+            "confidence",
+            "Status",
+        ],
+    )
+
+    if items_df.empty:
+        print(
+            "[ERROR] No parsable items to score. This usually means the model did not output valid JSON, "
+            "or it echoed the prompt JSON schema and no answer JSON was detected.",
+            file=sys.stderr,
+        )
+        print(
+            "[HINT] For local models like LLaVA, ensure the output ends with a valid JSON object like "
+            '{"label":"VISIBLE","reason_code":"NONE","confidence":0.9}.',
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     # Headline metrics use only 3 cells: BASE/TEXT_FLIP/IMAGE_FLIP (DOUBLE_FLIP is diagnostic only).
     headline_items_df = items_df[items_df["variant_relation"].isin(["BASE", "TEXT_FLIP", "IMAGE_FLIP"])].copy()
@@ -452,10 +492,10 @@ def main() -> None:
         f"DOUBLE_FLIP={missing_conf_answered_by_rel['DOUBLE_FLIP']}"
     )
     print(f"  Families with any unparsable cell          : {len(families_with_any_unparsable)}")
-    print("  Families dropped (base_label non-binary)   : 0")
+    print("  Families dropped (gold undefined)          : 0")
     if strict:
         print(f"  Families excluded from MEFR (missing cells): {families_excluded_from_mefr}")
-    print(f"  Families eligible for XOR (binary base)    : {families_eligible_for_xor}")
+    print(f"  Families eligible for XOR                  : {families_eligible_for_xor}")
     print(f"  Families included in MEFR denominators     : {len(eligible_family_set)}")
     print(f"  Items included for CAA/AURC/ToM (3 cells)  : {len(metrics_df)}")
     abstain_count = int((metrics_df["pred_label"].astype(str).str.upper() == "ABSTAIN").sum())
@@ -484,7 +524,7 @@ def main() -> None:
         f"n={int(aurc_diag['n_answered'])} "
         f"p={aurc_diag['answered_accuracy']:.4f} "
         f"A_model={aurc_diag['A_model']:.4f} "
-        f"raw={aurc_diag['raw_normalized']:.4f}"
+        f"normalized={aurc_diag['normalized']:.4f}"
     )
     print(f"  Second-order ToM accuracy                  : {metrics['second_order_accuracy']:.4f}")
     print(f"  Strict invariance consistency (IC_strict)  : {metrics['ic_strict']:.4f}")
