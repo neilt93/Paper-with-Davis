@@ -1,0 +1,23 @@
+REM Pull latest sheet with prefix (example prefix '11-14-25') into Sheets/11-14-25.csv
+REM Using your Google Sheets ID for the Davis visibility spreadsheet
+python scripts/cloud/pull_from_sheets.py --spreadsheet-id 1-DxRkbEPVvkjCMKDjl8k3tTkFU2FdQ5pr0w6PEuaCmI --latest-prefix "11-14-25"
+
+REM Run local visibility eval with LLaVA-OneVision on the pulled CSV
+python scripts/local/run_visibility_eval.py --input "Sheets/Pictures DB.csv" --model llava-onevision
+
+REM Run local visibility eval with Qwen-VL (if desired; currently requires correct HF model class support)
+python scripts/local/run_visibility_eval.py --input "Sheets/Pictures DB.csv" --model qwen-vl
+
+REM Run local visibility eval with Idefics2 (example; ensure model is available)
+python scripts/local/run_visibility_eval.py --input "Sheets/Pictures DB.csv" --model idefics2
+
+REM Example: run GPT via OpenAI API (requires OPENAI_API_KEY set)
+python scripts/local/run_visibility_eval.py --input "Sheets/Pictures DB.csv" --model gpt
+
+REM Score a single VLM run (LLaVA-OneVision, base side) and write a .scored.csv
+python scripts/scoring/score_vlm_run.py --input "Sheets/Pictures DB.llava-onevision.vlm.csv" --model llava-onevision --side base
+
+REM Push the scored CSV back to Google Sheets as a new sheet with timestamp
+REM Using your Google Sheets ID for the Davis visibility spreadsheet
+python scripts/cloud/push_to_sheets.py --spreadsheet-id 1-DxRkbEPVvkjCMKDjl8k3tTkFU2FdQ5pr0w6PEuaCmI --input "Sheets/Pictures DB.llava-onevision.vlm.scored.csv" --with-timestamp
+

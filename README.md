@@ -7,19 +7,22 @@ This repo is meant to make it painless to run your visibility benchmark on real 
 - `scripts/local/run_visibility_eval.py` – the main local entry point. Give it a sheet (CSV or Excel) and a model name (API or local HF), and it will:
   - filter to rows with `Status == "Done"`,
   - normalize image paths and questions,
-  - call the model on each base/flip image, and
-  - write per-image JSON outputs back to a new file.
+  - run the model on the **XOR 2×2** (base/flip image × base/flip question), and
+  - write per-cell JSON outputs back to a new file.
 - `scripts/local/vlm_inference.py` – an earlier, LLaVA-only local inference script (kept around as a backup).
 - `scripts/local/evaluate_gpt_visibility.py` – computes GPT-based visibility metrics from a CSV that already has `gpt_output_*` columns (your original GPT eval code).
+- `scripts/scoring/score_vlm_run.py` – scores a `*.vlm.csv` produced by `run_visibility_eval.py` using the XOR metric spec (CAA/MEFR/AURC/ToMAcc) and prints a report.
 
 ### What your sheet needs to look like
 
 For `scripts/local/run_visibility_eval.py`, the input table should (at minimum) have:
 
-- `id` – row identifier (e.g. `AV-01`).
+- `ID` (or `id`) – row identifier (e.g. `AV-01`).
 - `Status` – only rows with `Status == "Done"` are evaluated.
 - `pic_base`, `pic_flip` – image paths as they appear in your workflow. These can be absolute macOS-style paths like `/Users/neiltripathi/Documents/Paper with Davis/Images/IMG_0394.jpeg`.
-- `base_question` – the natural-language question for that pair (e.g. `Is the serial number readable`).
+- `base_question` – the base question.
+- `flip_question` – the text-flipped question (typically the strict negation of `base_question`).
+- `base_label` – optional. In the XOR dataset we assume BASE is always `NOT_VISIBLE`, so scoring does not require this column.
 
 You can keep using your existing sheets; you don’t need to rewrite paths by hand.
 
@@ -45,7 +48,7 @@ and skips the model call for that side.
 
 #### How questions are normalized
 
-Before sending to the model, `base_question` is lightly cleaned up:
+Before sending to the model, `base_question` and `flip_question` are lightly cleaned up:
 
 - leading/trailing whitespace is stripped,
 - the first character is capitalized, and
@@ -81,12 +84,14 @@ By default, the script writes a **CSV** next to the input, named:
 
 - `<input_basename>.<model>.vlm.csv`
 
-and adds two columns:
+and adds four columns (the XOR 2×2):
 
-- `<model>_base_json`
-- `<model>_flip_json`
+- `<model>_I0q0_json` (BASE): `pic_base × base_question`
+- `<model>_I0q1_json` (TEXT_FLIP): `pic_base × flip_question`
+- `<model>_I1q0_json` (IMAGE_FLIP): `pic_flip × base_question`
+- `<model>_I1q1_json` (DOUBLE_FLIP, diagnostic): `pic_flip × flip_question`
 
-Each cell contains the raw JSON/text from the model for that image, or an `ERROR: ...` message if something went wrong on that row.
+Each cell contains the raw JSON/text from the model for that (image, question) pair, or an `ERROR: ...` message if something went wrong on that row.
 
 If you’d rather get an Excel file directly, just give `--out` an `.xlsx` path, for example:
 
@@ -117,6 +122,19 @@ python scripts/cloud/pull_from_sheets.py \
 python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt
 ```
 
+#### Stage 2b – Score the run (XOR metrics)
+
+```bash
+python scripts/scoring/score_vlm_run.py --input "Sheets/11-14-25.gpt.vlm.csv" --model gpt --side xor
+```
+
+Notes:
+- Headline metrics are computed over **3 cells per family**: BASE/TEXT_FLIP/IMAGE_FLIP. DOUBLE_FLIP is diagnostic-only.
+- CAA uses abstain credit **α = 0.25** for `UNDETERMINABLE_FROM_EVIDENCE`.
+- AURC is computed over **answered-only** items (UNDETERMINABLE excluded from coverage).
+- ToM items are derived from IDs matching `^MA-` (no extra column needed).
+- Use `--strict-3cell` (default) to require the 3 headline cells to be parsable for a family to enter MEFR denominators. You can relax with `--no-strict-3cell`.
+
 #### Stage 3 – Push the results back as a new tab
 
 ```bash
@@ -128,7 +146,8 @@ python scripts/cloud/push_to_sheets.py \
 ```
 
 - This will create (or overwrite) a tab named something like
-  `11-14-25.gpt.2025-11-25_1530` inside the same spreadsheet, containing your original columns plus `gpt_base_json` / `gpt_flip_json`.
+  `11-14-25.gpt.2025-11-25_1530` inside the same spreadsheet, containing your original columns plus the four XOR output columns:
+  `gpt_I0q0_json`, `gpt_I0q1_json`, `gpt_I1q0_json`, `gpt_I1q1_json`.
 
 That will read your existing Excel sheet, run the eval, and write a new `.xlsx` with all the original columns plus the new model output columns, so you can open it straight in Excel or Google Sheets.
 

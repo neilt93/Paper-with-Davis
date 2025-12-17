@@ -9,10 +9,10 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure project root (where visibility_eval_core.py lives) is on sys.path
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+# Ensure the `scripts` directory (where visibility_eval_core.py lives) is on sys.path
+SCRIPT_ROOT = Path(__file__).resolve().parents[1]  # .../scripts
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
 
 from visibility_eval_core import load_table, run_on_dataframe
 
@@ -39,7 +39,7 @@ def main():
         action="store_true",
         help=(
             "Only run the model for rows where the output columns for this model "
-            "(<model>_base_json / <model>_flip_json) are empty."
+            "(<model>_I0q0_json / <model>_I0q1_json / <model>_I1q0_json / <model>_I1q1_json) are empty."
         ),
     )
     args = parser.parse_args()

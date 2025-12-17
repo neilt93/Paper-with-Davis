@@ -16,6 +16,19 @@ from typing import List
 
 import pandas as pd
 
+# Optional: load GOOGLE_APPLICATION_CREDENTIALS and other env vars from .env
+try:  # pragma: no cover
+    from dotenv import load_dotenv  # type: ignore
+except Exception:
+    load_dotenv = None  # type: ignore
+
+if load_dotenv is not None:
+    env_path = os.path.join(os.getcwd(), ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
+
 
 def get_gspread_client(creds_path: str):
     """

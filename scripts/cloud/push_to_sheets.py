@@ -14,6 +14,19 @@ from typing import List
 
 import pandas as pd
 
+# Optional: load GOOGLE_APPLICATION_CREDENTIALS and other env vars from .env
+try:  # pragma: no cover
+    from dotenv import load_dotenv  # type: ignore
+except Exception:
+    load_dotenv = None  # type: ignore
+
+if load_dotenv is not None:
+    env_path = os.path.join(os.getcwd(), ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
+
 
 def get_gspread_client(creds_path: str):
     """
@@ -57,7 +70,8 @@ def push_csv_to_sheet(spreadsheet_id: str, sheet_name: str, csv_path: str, creds
 
     # Resize sheet to fit data and update in one call
     ws.resize(rows=len(rows), cols=len(rows[0]))
-    ws.update("A1", rows)
+    # Use explicit keyword args to avoid gspread's deprecated positional order
+    ws.update(range_name="A1", values=rows)
 
 
 def main():

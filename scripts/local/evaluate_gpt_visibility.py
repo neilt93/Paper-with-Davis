@@ -107,16 +107,26 @@ def confidence_aware_accuracy(samples: List[Sample]) -> Tuple[float, List[Tuple[
     return sum(usable_scores) / len(usable_scores), per_scores
 
 
-# ---------- C: Minimal-Edit Flip Rate (MEFR) ----------
+# ---------- C: Conditional minimal-edit flip rates (MEFR) ----------
 
-def mefr(df_done: pd.DataFrame) -> float:
+def conditional_flip_rates(df_done: pd.DataFrame) -> Tuple[float, float, float]:
     """
-    For each row, we have a base and flip example.
-    We count a flip as correct (1) if:
-      - base prediction label matches base gold label, AND
-      - flip prediction label matches flip gold label.
+    Compute I_MEFR, T_MEFR, and MEFR under a simple 2×2 family assumption
+    for the legacy GPT-only CSV format.
+
+    Here we only have base/flip per row, so we interpret:
+      - BASE       ≈ base image/question
+      - IMAGE_FLIP ≈ flip image with same question
+    and leave TEXT_FLIP undefined (NaN).
+
+    I_MEFR: among rows where BASE is correct, fraction where IMAGE_FLIP is also correct.
+    T_MEFR: NaN (no explicit text flips in this format).
+    MEFR  : equals I_MEFR (since only one component is defined).
     """
-    scores = []
+    from math import nan
+
+    num_families = 0
+    num_correct_image = 0
 
     for _, row in df_done.iterrows():
         base_gold = str(row["base_label"])
@@ -126,14 +136,23 @@ def mefr(df_done: pd.DataFrame) -> float:
         flip_pred, _ = parse_pred_cell(row.get("gpt_output_flip", ""))
 
         if base_pred is None or flip_pred is None:
-            continue  # skip if missing
+            continue
 
-        correct_flip = (base_pred == base_gold) and (flip_pred == flip_gold)
-        scores.append(1.0 if correct_flip else 0.0)
+        base_correct = (base_pred == base_gold)
+        if not base_correct:
+            continue
 
-    if not scores:
-        return 0.0
-    return sum(scores) / len(scores)
+        num_families += 1
+        if flip_pred == flip_gold:
+            num_correct_image += 1
+
+    if num_families == 0:
+        return nan, nan, nan
+
+    i_mefr = num_correct_image / num_families
+    t_mefr = nan
+    mefr = i_mefr
+    return i_mefr, t_mefr, mefr
 
 
 # ---------- D: Abstention quality (normalized AURC) ----------
@@ -230,7 +249,7 @@ def final_composite_score(
     """
     Final Score =
       70% × Confidence-Aware Accuracy
-      15% × Minimal-Edit Flip Rate
+      15% × Mean conditional flip rate MEFR
       10% × Abstention Quality
        5% × Second-order ToM
 
@@ -292,7 +311,6 @@ def main():
         "flip_label",
         "gpt_output_base",
         "gpt_output_flip",
-        "category",
     }
     missing = required_cols - set(df.columns)
     if missing:
@@ -311,8 +329,8 @@ def main():
     # A: Confidence-aware accuracy
     conf_acc, per_sample_scores = confidence_aware_accuracy(samples)
 
-    # C: MEFR
-    mefr_score = mefr(df_done)
+    # C: Conditional MEFR (legacy: only image flips are defined)
+    i_mefr, t_mefr, mefr_score = conditional_flip_rates(df_done)
 
     # D: Abstention quality
     aurc_score = normalized_aurc(samples)
@@ -356,8 +374,10 @@ def main():
     print("\n### Overall GPT Metrics\n")
     print("| Metric | Value |")
     print("| --- | --- |")
-    print(f"| Confidence-aware accuracy (A) | {conf_acc:.4f} |")
-    print(f"| Minimal-Edit Flip Rate (MEFR, C) | {mefr_score:.4f} |")
+    print(f"| Confidence-aware accuracy (CAA, A) | {conf_acc:.4f} |")
+    print(f"| Image flip MEFR (I_MEFR | BASE-correct, C) | {i_mefr:.4f} |")
+    print(f"| Text flip MEFR (T_MEFR | BASE-correct, C) | {'N/A' if t_mefr is None else f'{t_mefr:.4f}'} |")
+    print(f"| Mean conditional flip rate (MEFR, C) | {mefr_score:.4f} |")
     print(f"| Abstention quality (normalized AURC, D) | {aurc_score:.4f} |")
     if tom_acc is not None:
         print(f"| Second-order ToM accuracy (E) | {tom_acc:.4f} |")
