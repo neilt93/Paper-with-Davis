@@ -52,7 +52,8 @@ def build_samples(df_done: pd.DataFrame) -> List[Sample]:
         category = str(row.get("category", ""))
 
         # Base image sample
-        base_gold = row["base_label"]
+        # base_label is optional in the newer XOR workflow; default is NOT_VISIBLE.
+        base_gold = row.get("base_label", "NOT_VISIBLE")
         base_pred_label, base_conf = parse_pred_cell(row.get("gpt_output_base", ""))
         samples.append(
             Sample(
@@ -129,7 +130,8 @@ def conditional_flip_rates(df_done: pd.DataFrame) -> Tuple[float, float, float]:
     num_correct_image = 0
 
     for _, row in df_done.iterrows():
-        base_gold = str(row["base_label"])
+        # base_label is optional in the newer XOR workflow; default is NOT_VISIBLE.
+        base_gold = str(row.get("base_label", "NOT_VISIBLE"))
         flip_gold = str(row["flip_label"])
 
         base_pred, _ = parse_pred_cell(row.get("gpt_output_base", ""))
@@ -304,14 +306,8 @@ def main():
 
     df = pd.read_csv(args.input)
 
-    required_cols = {
-        "id",
-        "Status",
-        "base_label",
-        "flip_label",
-        "gpt_output_base",
-        "gpt_output_flip",
-    }
+    # base_label is optional in the newer XOR workflow; default is NOT_VISIBLE.
+    required_cols = {"id", "Status", "flip_label", "gpt_output_base", "gpt_output_flip"}
     missing = required_cols - set(df.columns)
     if missing:
         print(f"Missing required columns: {', '.join(sorted(missing))}", file=sys.stderr)

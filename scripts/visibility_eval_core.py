@@ -247,6 +247,8 @@ class LocalHFAdapter(BaseAdapter):
             from transformers import (  # type: ignore
                 AutoProcessor,
                 AutoModelForCausalLM,
+                AutoModel,
+                AutoConfig,
             )
             try:
                 # Newer multimodal models like Qwen2.5-VL use this head
@@ -260,6 +262,8 @@ class LocalHFAdapter(BaseAdapter):
         self.torch = torch
         self.AutoProcessor = AutoProcessor
         self.AutoModelForCausalLM = AutoModelForCausalLM
+        self.AutoModel = AutoModel
+        self.AutoConfig = AutoConfig
         self.AutoModelForImageTextToText = AutoModelForImageTextToText  # type: ignore[attr-defined]
 
         if torch.cuda.is_available():
@@ -267,26 +271,109 @@ class LocalHFAdapter(BaseAdapter):
         else:
             dtype = torch.float32
 
-        self.processor = AutoProcessor.from_pretrained(
-            model_id,
-            trust_remote_code=True,
-        )
+        # Some community quantized repos have incomplete/misconfigured image processor metadata.
+        # If AutoProcessor can't be inferred, fall back to the base Qwen2.5-VL processor.
+        is_molmo = "molmo" in model_id.lower()
+        try:
+            processor_kwargs = {
+                "trust_remote_code": True,
+            }
+            if is_molmo:
+                processor_kwargs["use_fast"] = False  # Silences the warning for Molmo2
+            self.processor = AutoProcessor.from_pretrained(
+                model_id,
+                **processor_kwargs,
+            )
+        except Exception as e:
+            msg = str(e)
+            if "Unrecognized image processor" in msg or "image_processor_type" in msg:
+                self.processor = AutoProcessor.from_pretrained(
+                    "Qwen/Qwen2.5-VL-3B-Instruct",
+                    trust_remote_code=True,
+                )
+            else:
+                raise
 
-        # Special-case Qwen2.5-VL to avoid the AutoModelForCausalLM config error
+        # Special-case Qwen2.5-VL, Molmo2, and PaliGemma2 to avoid the AutoModelForCausalLM config error
         is_qwen_vision = "qwen2.5-vl" in model_id.lower() or "qwen2_5_vl" in model_id.lower()
+        is_paligemma = "paligemma" in model_id.lower()
 
         if is_qwen_vision and self.AutoModelForImageTextToText is not None:  # type: ignore[truthy-function]
             ModelCls = self.AutoModelForImageTextToText
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                torch_dtype=dtype,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+        elif is_molmo:
+            if self.AutoModelForImageTextToText is None:  # type: ignore[comparison-overlap]
+                raise RuntimeError(
+                    "Molmo2 requires AutoModelForImageTextToText which is not available. "
+                    "Please upgrade transformers: pip install --upgrade transformers"
+                )
+            # Molmo2 uses AutoModelForImageTextToText with trust_remote_code
+            self.model = self.AutoModelForImageTextToText.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+                device_map="auto",
+                torch_dtype=dtype,
+            )
+        elif is_paligemma:
+            # PaliGemma2 uses AutoModelForImageTextToText with trust_remote_code
+            if self.AutoModelForImageTextToText is None:  # type: ignore[comparison-overlap]
+                raise RuntimeError(
+                    "PaliGemma2 requires AutoModelForImageTextToText which is not available. "
+                    "Please upgrade transformers: pip install --upgrade transformers"
+                )
+            self.model = self.AutoModelForImageTextToText.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+                device_map="auto",
+                torch_dtype=dtype,
+            )
         else:
             ModelCls = self.AutoModelForCausalLM
-
-        self.model = ModelCls.from_pretrained(
-            model_id,
-            dtype=dtype,
-            device_map="auto",
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-        )
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                dtype=dtype,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+        # Get the actual device from the model's parameters (skip meta tensors).
+        # This avoids "Cannot copy out of meta tensor" errors with quantized models.
+        self.device = None
+        try:
+            # Iterate through parameters and find the first non-meta tensor
+            for param in self.model.parameters():
+                try:
+                    param_device = param.device
+                    if param_device.type != "meta":
+                        self.device = param_device
+                        break
+                except RuntimeError:
+                    # Skip meta tensors
+                    continue
+            
+            # If we didn't find a non-meta parameter, try named_parameters
+            if self.device is None:
+                for name, param in self.model.named_parameters():
+                    try:
+                        param_device = param.device
+                        if param_device.type != "meta":
+                            self.device = param_device
+                            break
+                    except RuntimeError:
+                        continue
+            
+            # Final fallback: assume CUDA if available
+            if self.device is None:
+                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        except Exception:
+            # Fallback if anything goes wrong
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.eval()
 
     def answer(self, image_path: str, prompt: str) -> ModelResponse:
@@ -308,19 +395,43 @@ class LocalHFAdapter(BaseAdapter):
             new_size = (int(w * scale), int(h * scale))
             image = image.resize(new_size, Image.LANCZOS)
 
-        conversation = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ]
-        tpl = self.processor.apply_chat_template(conversation, add_generation_prompt=True)
-        inputs = self.processor(text=tpl, images=image, return_tensors="pt").to(self.model.device)
+        # Try to use chat template, but fall back to direct prompt for models without templates (e.g., PaliGemma2)
+        try:
+            conversation = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image"},
+                        {"type": "text", "text": prompt},
+                    ],
+                }
+            ]
+            tpl = self.processor.apply_chat_template(conversation, add_generation_prompt=True)
+            inputs = self.processor(text=tpl, images=image, return_tensors="pt").to(self.device)
+        except (ValueError, TypeError, AttributeError) as e:
+            # If chat template is not available, use the prompt directly
+            # For PaliGemma2 and similar models, add <image> token at the beginning
+            if "chat template" in str(e).lower() or "apply_chat_template" in str(e).lower():
+                # Check if this is a PaliGemma processor that needs <image> tokens
+                processor_type = type(self.processor).__name__
+                if "PaliGemma" in processor_type or "paligemma" in str(type(self.processor)).lower():
+                    # PaliGemma expects <image> token at the beginning of the text
+                    # Also add explicit JSON instruction at the end to force JSON output
+                    prompt_with_image = f"<image>{prompt}\n\nOutput your response as JSON only, starting with {{ and ending with }}."
+                    inputs = self.processor(text=prompt_with_image, images=image, return_tensors="pt").to(self.device)
+                else:
+                    inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
+            else:
+                raise
+        
+        # Filter out processor keys that aren't used by model.generate()
+        # Llama 3.2 Vision processor returns keys like pixel_values, aspect_ratio_ids, aspect_ratio_mask
+        # that should not be passed to generate() - these are for forward() only
+        keys_to_remove = {"pixel_values", "aspect_ratio_ids", "aspect_ratio_mask"}
+        inputs_for_generate = {k: v for k, v in inputs.items() if k not in keys_to_remove}
+        
         with self.torch.no_grad():
-            ids = self.model.generate(**inputs, max_new_tokens=128)
+            ids = self.model.generate(**inputs_for_generate, max_new_tokens=128)
         text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
         return ModelResponse(raw_text=text.strip())
 
@@ -343,11 +454,22 @@ class QwenLocalAdapter(BaseAdapter):
             from transformers import (  # type: ignore
                 AutoProcessor,
                 AutoModelForCausalLM,
+                AutoConfig,
             )
             try:
                 from transformers import AutoModelForImageTextToText  # type: ignore
             except ImportError:
                 AutoModelForImageTextToText = None  # type: ignore[assignment]
+            try:
+                from transformers import BitsAndBytesConfig  # type: ignore
+            except ImportError:
+                BitsAndBytesConfig = None  # type: ignore[assignment]
+            # Also check if bitsandbytes module itself is importable
+            try:
+                import bitsandbytes  # type: ignore
+                has_bitsandbytes = True
+            except (ImportError, ModuleNotFoundError):
+                has_bitsandbytes = False
             import torch  # type: ignore
         except ImportError:
             raise RuntimeError("Missing transformers/torch. Install with `pip install transformers torch`.")
@@ -355,17 +477,37 @@ class QwenLocalAdapter(BaseAdapter):
         self.torch = torch
         self.AutoProcessor = AutoProcessor
         self.AutoModelForCausalLM = AutoModelForCausalLM
+        self.AutoConfig = AutoConfig
         self.AutoModelForImageTextToText = AutoModelForImageTextToText  # type: ignore[attr-defined]
+        self.BitsAndBytesConfig = BitsAndBytesConfig  # type: ignore[attr-defined]
+        self.has_bitsandbytes = has_bitsandbytes
 
-        # Prefer GPU if available; use float32 for extra stability.
+        # Prefer GPU if available. Use FP16 on CUDA for a big speedup.
+        # (FP32 is much slower and rarely necessary for inference here.)
         if torch.cuda.is_available():
             device = "cuda"
+            dtype = torch.float16
+            # Allow TF32 for additional speed on Ampere+ GPUs.
+            try:  # pragma: no cover
+                torch.backends.cuda.matmul.allow_tf32 = True
+                torch.backends.cudnn.allow_tf32 = True
+            except Exception:
+                pass
         else:
             device = "cpu"
-        dtype = torch.float32
+            dtype = torch.float32
+
+        # Some quantized community checkpoints (e.g. jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit)
+        # have incomplete or older preprocessor configs. In those cases, re-use the official
+        # Qwen processor while loading weights from the quantized repo to avoid
+        # "Unrecognized image processor" errors.
+        processor_id = model_id
+        lower_id = model_id.lower()
+        if "jarvisvasu/qwen2.5-vl-3b-instruct-4bit" in lower_id:
+            processor_id = "Qwen/Qwen2.5-VL-3B-Instruct"
 
         self.processor = AutoProcessor.from_pretrained(
-            model_id,
+            processor_id,
             trust_remote_code=True,
         )
 
@@ -375,14 +517,105 @@ class QwenLocalAdapter(BaseAdapter):
         else:
             ModelCls = self.AutoModelForCausalLM
 
-        self.model = ModelCls.from_pretrained(
-            model_id,
-            torch_dtype=dtype,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True,
-        )
-        # Move the whole model to the chosen device (GPU if available).
-        self.model.to(device)
+        # If the checkpoint declares bitsandbytes 4-bit quantization in its config,
+        # prefer loading it in 4-bit (much faster / smaller) instead of full-precision.
+        # Example: jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit
+        cfg = self.AutoConfig.from_pretrained(model_id, trust_remote_code=True)
+        quant_cfg = getattr(cfg, "quantization_config", None)
+        is_bnb_4bit = False
+        if isinstance(quant_cfg, dict):
+            is_bnb_4bit = (quant_cfg.get("quant_method") == "bitsandbytes") and bool(quant_cfg.get("load_in_4bit"))
+
+        if is_bnb_4bit:
+            # bitsandbytes 4-bit quantization path (e.g. jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit).
+            # The checkpoint already carries its own quantization_config, so we let
+            # `from_pretrained` honor that and just request device_map="auto".
+            if device != "cuda":
+                raise RuntimeError("bitsandbytes 4-bit quantization requires CUDA. Use a GPU-enabled environment.")
+            if not self.has_bitsandbytes or self.BitsAndBytesConfig is None:
+                # bitsandbytes not available - fall back to loading base model or loading without quantization
+                print(
+                    "[WARN] bitsandbytes not available. Loading base Qwen2.5-VL model instead of quantized version.",
+                    file=sys.stderr,
+                )
+                # Load the base model instead
+                base_model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+                self.model = ModelCls.from_pretrained(
+                    base_model_id,
+                    dtype=dtype,
+                    low_cpu_mem_usage=True,
+                    device_map="auto",
+                    trust_remote_code=True,
+                )
+                # When using low_cpu_mem_usage / accelerate dispatch, do NOT call .to(...).
+                # Just keep an input device handle.
+                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            else:
+                # bitsandbytes is available, try to load the quantized model.
+                # However, some pre-quantized checkpoints (e.g. jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit)
+                # trigger a meta-tensor dispatch bug on Windows/Python 3.13 when transformers/accelerate
+                # tries to dispatch the model. If this fails, fall back to the base FP16 model.
+                try:
+                    self.model = ModelCls.from_pretrained(
+                        model_id,
+                        trust_remote_code=True,
+                        device_map={"": 0},  # Explicit CUDA placement to avoid meta tensor dispatch
+                    )
+                    self.device = torch.device("cuda")
+                except Exception as e:
+                    # If loading the quantized checkpoint fails due to meta tensor dispatch issues
+                    # (common on Windows), fall back to the base FP16 model for compatibility.
+                    if "meta tensor" in str(e).lower() or "to_empty" in str(e).lower() or "Cannot copy out of meta" in str(e):
+                        print(
+                            f"[WARN] Pre-quantized checkpoint '{model_id}' failed to load (Windows/meta-tensor incompatibility).",
+                            file=sys.stderr,
+                        )
+                        print(
+                            f"[WARN] Falling back to base FP16 model 'Qwen/Qwen2.5-VL-3B-Instruct' for compatibility.",
+                            file=sys.stderr,
+                        )
+                        # Load the base model in FP16 instead (still fast, just not quantized)
+                        # Use bfloat16 if available (more stable than float16 on some hardware)
+                        base_model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
+                        if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                            fallback_dtype = torch.bfloat16
+                        else:
+                            fallback_dtype = dtype
+                        self.model = ModelCls.from_pretrained(
+                            base_model_id,
+                            dtype=fallback_dtype,
+                            low_cpu_mem_usage=True,
+                            device_map="auto",
+                            trust_remote_code=True,
+                        )
+                        # Get device from model parameters (skip meta tensors)
+                        self.device = None
+                        try:
+                            for param in self.model.parameters():
+                                try:
+                                    param_device = param.device
+                                    if param_device.type != "meta":
+                                        self.device = param_device
+                                        break
+                                except RuntimeError:
+                                    continue
+                            if self.device is None:
+                                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                        except Exception:
+                            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                    else:
+                        raise
+        else:
+            # transformers >= 4.46 prefers `dtype=` over deprecated `torch_dtype=`
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                dtype=dtype,
+                low_cpu_mem_usage=True,
+                device_map="auto",
+                trust_remote_code=True,
+            )
+            # When using low_cpu_mem_usage / accelerate dispatch, do NOT call .to(...).
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.eval()
 
     def answer(self, image_path: str, prompt: str) -> ModelResponse:
@@ -392,8 +625,9 @@ class QwenLocalAdapter(BaseAdapter):
         """
         image = Image.open(image_path).convert("RGB")
 
-        # Slight downscaling for speed on CPU; keep enough detail for Qwen.
-        max_side = 768
+        # Downscale for speed; Qwen2.5-VL is expensive at high resolutions.
+        # 512 is a good default tradeoff for this dataset.
+        max_side = 512
         w, h = image.size
         if max(w, h) > max_side:
             scale = max_side / float(max(w, h))
@@ -410,13 +644,42 @@ class QwenLocalAdapter(BaseAdapter):
             }
         ]
         tpl = self.processor.apply_chat_template(conversation, add_generation_prompt=True)
-        inputs = self.processor(text=tpl, images=image, return_tensors="pt").to(self.model.device)
+        inputs = self.processor(text=tpl, images=image, return_tensors="pt")
+        
+        # Ensure inputs are on the correct device by checking where model parameters actually are
+        # (device_map="auto" can spread model across devices, but inputs usually go to the main device)
+        try:
+            # Try to get device from model's first parameter
+            model_device = next(self.model.parameters()).device
+        except (StopIteration, RuntimeError):
+            # Fallback to self.device if we can't determine model device
+            model_device = self.device
+        
+        # Move all input tensors to the model's device (handle dict of tensors correctly)
+        inputs = {k: v.to(model_device) if isinstance(v, self.torch.Tensor) else v for k, v in inputs.items()}
+        
         with self.torch.no_grad():
-            ids = self.model.generate(**inputs, max_new_tokens=128)
+            # 64 tokens is plenty for a single minified JSON object.
+            # Add error handling for CUDA device-side asserts
+            try:
+                ids = self.model.generate(**inputs, max_new_tokens=64)
+            except RuntimeError as e:
+                error_str = str(e)
+                if "CUDA error" in error_str or "device-side assert" in error_str:
+                    # CUDA device-side assert - clear cache and provide better error message
+                    if self.torch.cuda.is_available():
+                        self.torch.cuda.empty_cache()
+                    # This often indicates an incompatibility with the FP16 model or input processing
+                    raise RuntimeError(
+                        f"CUDA device-side assert during Qwen generation. "
+                        f"This may indicate a compatibility issue with FP16 Qwen2.5-VL on Windows. "
+                        f"Try using a different model (e.g., LLaVA) or running on CPU. "
+                        f"Original error: {error_str}"
+                    ) from e
+                raise
         text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
 
         # Post-process to keep only the final JSON object if we can find it.
-        s = text.strip()
         s = text.strip()
         try:
             # Take the last {...} block in the string.
@@ -445,10 +708,20 @@ def get_adapter(model_name: str) -> BaseAdapter:
     # Qwen gets a custom adapter so we can post-process its outputs.
     if name == "qwen-vl":
         return QwenLocalAdapter("Qwen/Qwen2.5-VL-3B-Instruct")
+    # Quantized (bitsandbytes NF4) Qwen. Works on Windows if CUDA + bitsandbytes are installed.
+    if name in {"qwen-vl-4bit", "qwen-vl-bnb4"}:
+        return QwenLocalAdapter("jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit")
+    # Quantized Qwen (faster). Requires the checkpoint to be loadable in your environment.
+    if name in {"qwen-vl-awq", "qwen-vl-3b-awq"}:
+        return QwenLocalAdapter("Qwen/Qwen2.5-VL-3B-Instruct-AWQ")
 
     hf_map = {
         "llava-onevision": "lmms-lab/LLaVA-OneVision-1.5-4B-Instruct",
         "idefics2": "HuggingFaceM4/idefics2-8b",
+        # Baselines (may be gated on HF)
+        "molmo": "allenai/Molmo2-4B",
+        "gemma": "google/paligemma2-3b-mix-448",
+        "llama-vision": "meta-llama/Llama-3.2-11B-Vision-Instruct",
     }
     if name in hf_map:
         return LocalHFAdapter(hf_map[name])

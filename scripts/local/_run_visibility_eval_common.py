@@ -1,8 +1,12 @@
-"""CLI script to run visibility evaluation on a local CSV/Excel file.
+"""Shared CLI helper for per-model runner scripts.
 
-Usage: see README or run with -h. This is a thin wrapper around the
-core logic in `visibility_eval_core.run_on_dataframe`.
+These wrappers exist so you can run a model with a stable alias (clean output
+column prefixes) without remembering the exact `--model` string.
+
+Each wrapper passes a fixed `model_name` into `visibility_eval_core.run_on_dataframe`.
 """
+
+from __future__ import annotations
 
 import argparse
 import os
@@ -14,20 +18,12 @@ SCRIPT_ROOT = Path(__file__).resolve().parents[1]  # .../scripts
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
-from visibility_eval_core import load_table, run_on_dataframe
+from visibility_eval_core import load_table, run_on_dataframe  # noqa: E402
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Run visibility eval for a CSV/Excel against a VLM (API or local)."
-    )
+def main_with_model(model_name: str, description: str) -> None:
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--input", "-i", required=True, help="Input CSV/Excel with visibility dataset.")
-    parser.add_argument(
-        "--model",
-        "-m",
-        required=True,
-        help="Model name: e.g. gpt, gemini, llava-onevision, qwen-vl, qwen-vl-4bit, or a HF repo id for local.",
-    )
     parser.add_argument(
         "--out",
         "-o",
@@ -46,24 +42,32 @@ def main():
 
     if not os.path.exists(args.input):
         print(f"[ERROR] Input file not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit(1)
 
     try:
         df = load_table(args.input)
     except Exception as e:
         print(f"[ERROR] Failed to read table '{args.input}': {e}", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit(1)
 
     try:
-        df_done = run_on_dataframe(df, args.model, only_missing=args.only_missing)
+        df_done = run_on_dataframe(df, model_name, only_missing=bool(args.only_missing))
     except Exception as e:
+        msg = str(e)
+        # Common HF gated-model error message.
+        if "Cannot access gated repo" in msg or "401 Client Error" in msg or "restricted" in msg:
+            print(
+                "[HINT] This model is gated on Hugging Face. Run `huggingface-cli login` "
+                "or set HF_TOKEN in your environment, then retry.",
+                file=sys.stderr,
+            )
         print(f"[ERROR] Core evaluation failed: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit(1)
 
     out_path = args.out
     if out_path is None:
-        base, ext = os.path.splitext(args.input)
-        out_path = f"{base}.{args.model}.vlm.csv"
+        base, _ext = os.path.splitext(args.input)
+        out_path = f"{base}.{model_name}.vlm.csv"
 
     try:
         out_ext = os.path.splitext(out_path.lower())[1]
@@ -73,12 +77,8 @@ def main():
             df_done.to_csv(out_path, index=False)
     except Exception as e:
         print(f"[ERROR] Failed to write output table '{out_path}': {e}", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit(1)
 
     print(f"[INFO] Done. saved={out_path}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
 
 

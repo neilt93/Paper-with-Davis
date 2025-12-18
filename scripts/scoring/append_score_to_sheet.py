@@ -24,6 +24,19 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
+# Optional: load GOOGLE_APPLICATION_CREDENTIALS and other env vars from .env
+try:  # pragma: no cover
+    from dotenv import load_dotenv  # type: ignore
+except Exception:
+    load_dotenv = None  # type: ignore
+
+if load_dotenv is not None:
+    env_path = os.path.join(os.getcwd(), ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+    else:
+        load_dotenv()
+
 # Make it easy to import sibling scoring modules when run as a script.
 THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
@@ -53,15 +66,8 @@ def get_gspread_client(creds_path: str):
     return client
 
 
-def _xor_gold_from_base(base_label: Any) -> Dict[str, str]:
-    """
-    XOR gold mapping.
-
-    Default assumption: BASE is always NOT_VISIBLE. If a binary base_label is present, we respect it.
-    """
-    b = _normalise_label(base_label)
-    if b == "VISIBLE":
-        return {"BASE": "VISIBLE", "TEXT_FLIP": "NOT_VISIBLE", "IMAGE_FLIP": "NOT_VISIBLE", "DOUBLE_FLIP": "VISIBLE"}
+def _xor_gold_fixed() -> Dict[str, str]:
+    """Fixed XOR gold mapping for this dataset (BASE is always NOT_VISIBLE)."""
     return {"BASE": "NOT_VISIBLE", "TEXT_FLIP": "VISIBLE", "IMAGE_FLIP": "VISIBLE", "DOUBLE_FLIP": "NOT_VISIBLE"}
 
 
@@ -149,7 +155,7 @@ def main() -> None:
                 unparsable_items_by_rel[rel] += 1
                 families_with_any_unparsable.add(fam)
 
-        golds = _xor_gold_from_base(row.get("base_label") if "base_label" in row else None)
+        golds = _xor_gold_fixed()
 
         if all(parsed_labels.get(rel) is not None for rel in ("BASE", "TEXT_FLIP", "IMAGE_FLIP")):
             complete_headline_families.add(fam)

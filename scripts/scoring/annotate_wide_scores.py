@@ -77,13 +77,8 @@ def main() -> None:
         print(f"[ERROR] Missing XOR columns: {', '.join(missing)}", file=sys.stderr)
         sys.exit(1)
 
-    def xor_gold_from_base(base_label: Any) -> Optional[Dict[str, str]]:
-        b = _normalise_label(base_label)
-        if b == "NOT_VISIBLE":
-            return {"BASE": "NOT_VISIBLE", "TEXT_FLIP": "VISIBLE", "IMAGE_FLIP": "VISIBLE", "DOUBLE_FLIP": "NOT_VISIBLE"}
-        if b == "VISIBLE":
-            return {"BASE": "VISIBLE", "TEXT_FLIP": "NOT_VISIBLE", "IMAGE_FLIP": "NOT_VISIBLE", "DOUBLE_FLIP": "VISIBLE"}
-        return None
+    def xor_gold_fixed() -> Dict[str, str]:
+        return {"BASE": "NOT_VISIBLE", "TEXT_FLIP": "VISIBLE", "IMAGE_FLIP": "VISIBLE", "DOUBLE_FLIP": "NOT_VISIBLE"}
 
     # Explode into long items.
     rows_long: list[dict[str, Any]] = []
@@ -108,10 +103,7 @@ def main() -> None:
                 unparsable_items += 1
                 families_with_any_unparsable.add(fam)
 
-        golds = xor_gold_from_base(row.get("base_label"))
-        if golds is None:
-            dropped_families_bad_gold += 1
-            continue
+        golds = xor_gold_fixed()
 
         if all(parsed_labels.get(rel) is not None for rel in ("BASE", "TEXT_FLIP", "IMAGE_FLIP")):
             complete_headline_families.add(fam)
@@ -169,7 +161,8 @@ def main() -> None:
     out_df["overall_total_cells_4x_done"] = int(4 * len(done_df))
     out_df["overall_unparsable_items"] = int(unparsable_items)
     out_df["overall_families_with_any_unparsable"] = int(len(families_with_any_unparsable))
-    out_df["overall_families_dropped_base_label_nonbinary"] = int(dropped_families_bad_gold)
+    # base_label is not used in the XOR workflow; keep a stable output column.
+    out_df["overall_families_dropped_base_label_nonbinary"] = 0
     out_df["overall_families_in_mefr_denoms"] = int(len(eligible_family_set))
     out_df["overall_items_scored_headline_3cell"] = int(len(metrics_df))
     out_df["overall_effective_w_CAA"] = eff_w.get("core_confidence_accuracy")
