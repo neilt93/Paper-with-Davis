@@ -1,3 +1,11 @@
+# VLM Visibility Evaluation
+
+> **Note:** This repository accompanies our paper (draft): [Paper_with_Davis.pdf](./Paper_with_Davis.pdf)
+
+This project evaluates Vision Language Models (VLMs) on their ability to correctly determine whether specific visual information is perceivable in images.
+
+---
+
 ## Visibility evaluation scripts
 
 This repo is meant to make it painless to run your visibility benchmark on real models and keep everything in sync with your sheets.

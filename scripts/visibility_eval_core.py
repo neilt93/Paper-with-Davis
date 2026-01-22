@@ -207,26 +207,77 @@ class GPTAdapter(BaseAdapter):
 
 class GeminiAdapter(BaseAdapter):
     """
-    Google Gemini 1.5 Pro vision.
-    Requires GEMINI_API_KEY in environment and google-generativeai installed.
+    Google Gemini 1.5 vision via new google-genai client (v1).
+    Falls back to legacy google-generativeai if google-genai is unavailable.
+    Requires GEMINI_API_KEY in environment.
     """
 
-    def __init__(self, model: str = "gemini-1.5-pro"):
-        try:
-            import google.generativeai as genai  # type: ignore
-        except ImportError:
-            raise RuntimeError("Missing google-generativeai. Install with `pip install google-generativeai`.")
+    def __init__(self, model: str = "gemini-2.0-flash"):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY not set in environment.")
-        genai.configure(api_key=api_key)
-        self.genai = genai
-        self.model = genai.GenerativeModel(model)
+        # Prefer new google-genai client; fall back to google-generativeai if not available
+        self._use_new_client = False
+        self._model_name = model
+        try:
+            from google import genai  # type: ignore
+            # Defer import of types to avoid hard dependency when falling back
+            from google.genai import types as genai_types  # type: ignore
+            self._use_new_client = True
+            self._genai = genai
+            self._genai_types = genai_types
+            self._client = genai.Client(api_key=api_key)
+        except Exception:
+            # Legacy fallback (deprecated by Google, still works in some environments)
+            try:
+                import google.generativeai as genai_legacy  # type: ignore
+            except Exception as e:
+                raise RuntimeError(
+                    "Missing google-genai (preferred) or google-generativeai (legacy). "
+                    "Install with `pip install google-genai` (preferred) or `pip install google-generativeai`."
+                ) from e
+            genai_legacy.configure(api_key=api_key)
+            self._legacy_model = genai_legacy.GenerativeModel(model)
+            self._genai_legacy = genai_legacy
 
     def answer(self, image_path: str, prompt: str) -> ModelResponse:
+        # New client path (v1 Responses API)
+        if self._use_new_client:
+            with open(image_path, "rb") as f:
+                img_bytes = f.read()
+            # Try to guess mime type from extension; default to JPEG
+            import mimetypes
+            mime, _ = mimetypes.guess_type(image_path)
+            mime = mime or "image/jpeg"
+            try:
+                part_image = self._genai_types.Part.from_bytes(data=img_bytes, mime_type=mime)  # type: ignore[attr-defined]
+            except Exception:
+                # Fallback: older versions expose Part under google.genai.types directly
+                part_image = self._genai.types.Part.from_bytes(data=img_bytes, mime_type=mime)  # type: ignore[attr-defined]
+            resp = self._client.models.generate_content(  # type: ignore[attr-defined]
+                model=self._model_name,
+                contents=[part_image, prompt],
+            )
+            # Robust extraction across library versions
+            text = getattr(resp, "text", None) or getattr(resp, "output_text", None)
+            if not text:
+                try:
+                    # Try to drill into candidates if needed
+                    cand = resp.candidates[0]
+                    # Prefer aggregated text if available
+                    text = getattr(cand, "text", None)
+                    if not text and getattr(cand, "content", None) and getattr(cand.content, "parts", None):
+                        parts = cand.content.parts
+                        # Concatenate any text parts
+                        text = "".join(getattr(p, "text", "") for p in parts if hasattr(p, "text"))
+                except Exception:
+                    text = ""
+            return ModelResponse(raw_text=(text or "").strip())
+
+        # Legacy client path (v1beta generateContent)
         img = Image.open(image_path)
-        resp = self.model.generate_content([prompt, img])
-        return ModelResponse(raw_text=resp.text)
+        resp = self._legacy_model.generate_content([prompt, img])  # type: ignore[attr-defined]
+        return ModelResponse(raw_text=getattr(resp, "text", "") or "")
 
 
 class LocalHFAdapter(BaseAdapter):
@@ -294,9 +345,20 @@ class LocalHFAdapter(BaseAdapter):
             else:
                 raise
 
-        # Special-case Qwen2.5-VL, Molmo2, and PaliGemma2 to avoid the AutoModelForCausalLM config error
+        # Special-case Qwen2.5-VL, Molmo2, PaliGemma2, and Llama Vision to avoid the AutoModelForCausalLM config error
         is_qwen_vision = "qwen2.5-vl" in model_id.lower() or "qwen2_5_vl" in model_id.lower()
         is_paligemma = "paligemma" in model_id.lower()
+        is_llama_vision = "llama" in model_id.lower() and "vision" in model_id.lower()
+
+        # Check if we should use 4-bit quantization for Llama (to reduce memory)
+        use_4bit_quantization = False
+        if is_llama_vision:
+            try:
+                from transformers import BitsAndBytesConfig  # type: ignore
+                import bitsandbytes  # type: ignore
+                use_4bit_quantization = True
+            except ImportError:
+                pass  # Will use full precision
 
         if is_qwen_vision and self.AutoModelForImageTextToText is not None:  # type: ignore[truthy-function]
             ModelCls = self.AutoModelForImageTextToText
@@ -332,6 +394,23 @@ class LocalHFAdapter(BaseAdapter):
                 trust_remote_code=True,
                 device_map="auto",
                 torch_dtype=dtype,
+            )
+        elif is_llama_vision and use_4bit_quantization:
+            # Load Llama Vision with 4-bit quantization to reduce memory
+            from transformers import BitsAndBytesConfig  # type: ignore
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
+            )
+            ModelCls = self.AutoModelForCausalLM
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                quantization_config=quantization_config,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
             )
         else:
             ModelCls = self.AutoModelForCausalLM
@@ -435,6 +514,75 @@ class LocalHFAdapter(BaseAdapter):
         text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
         return ModelResponse(raw_text=text.strip())
 
+
+class ClaudeAdapter(BaseAdapter):
+    """
+    Anthropic Claude (vision-capable).
+    Requires ANTHROPIC_API_KEY in environment and anthropic installed.
+    """
+
+    def __init__(self, model: str = "claude-3-7-sonnet-latest"):
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise RuntimeError("ANTHROPIC_API_KEY not set in environment.")
+        try:
+            from anthropic import Anthropic  # type: ignore
+        except ImportError:
+            raise RuntimeError("Missing anthropic. Install with `pip install anthropic`.")
+        self.client = Anthropic(api_key=api_key)
+        self.model = model
+
+    def answer(self, image_path: str, prompt: str) -> ModelResponse:
+        # Build Claude messages with image + text.
+        # Compress/resize to stay under Anthropic's 5MB per-image limit.
+        import io
+        from PIL import Image as PILImage  # avoid name clash
+        img = PILImage.open(image_path).convert("RGB")
+        # Downscale if very large
+        max_side = 1536
+        w, h = img.size
+        if max(w, h) > max_side:
+            scale = max_side / float(max(w, h))
+            img = img.resize((int(w * scale), int(h * scale)), PILImage.LANCZOS)
+        # Compress iteratively until <= 5MB
+        buf = io.BytesIO()
+        quality = 85
+        while True:
+            buf.seek(0)
+            buf.truncate(0)
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            size = buf.tell()
+            if size <= 5 * 1024 * 1024 or quality <= 60:
+                break
+            quality -= 5
+        img_bytes = buf.getvalue()
+        b64 = __import__("base64").b64encode(img_bytes).decode("utf-8")
+        mime = "image/jpeg"
+
+        msg = self.client.messages.create(
+            model=self.model,
+            max_tokens=256,
+            system="You must respond with ONLY a valid JSON object. No prose, no explanations, no markdown. Just the JSON.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": mime, "data": b64},
+                        },
+                        {"type": "text", "text": prompt + "\n\nIMPORTANT: Respond with ONLY the JSON object, no other text."},
+                    ],
+                }
+            ],
+        )
+        # Extract text from content blocks
+        text_parts = []
+        for part in getattr(msg, "content", []) or []:
+            if getattr(part, "type", "") == "text":
+                text_parts.append(getattr(part, "text", "") or "")
+        text = "".join(text_parts).strip()
+        return ModelResponse(raw_text=text)
 
 class QwenLocalAdapter(BaseAdapter):
     """
@@ -703,7 +851,11 @@ def get_adapter(model_name: str) -> BaseAdapter:
         return GPTAdapter(model="gpt-4.1-mini")
 
     if name in {"gemini", "gemini-1.5"}:
-        return GeminiAdapter(model="gemini-1.5-pro")
+        # Default to a widely available 2.0 Flash model (vision-capable).
+        return GeminiAdapter(model="gemini-2.0-flash")
+
+    if name in {"claude", "anthropic", "claude-sonnet", "claude-3-5", "claude-3-7"}:
+        return ClaudeAdapter(model="claude-3-7-sonnet-latest")
 
     # Qwen gets a custom adapter so we can post-process its outputs.
     if name == "qwen-vl":
@@ -729,7 +881,22 @@ def get_adapter(model_name: str) -> BaseAdapter:
     return LocalHFAdapter(model_name)
 
 
-def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = False) -> pd.DataFrame:
+def _save_dataframe(df: pd.DataFrame, save_path: Optional[str]) -> None:
+    """Helper to save dataframe to CSV or Excel based on extension."""
+    if not save_path:
+        return
+    try:
+        out_ext = os.path.splitext(save_path.lower())[1]
+        if out_ext in {".xlsx", ".xls"}:
+            df.to_excel(save_path, index=False)
+        else:
+            df.to_csv(save_path, index=False)
+        print(f"[SAVE] Incremental save: {save_path}", file=sys.stderr)
+    except Exception as e:
+        print(f"[WARN] Failed to save incrementally to '{save_path}': {e}", file=sys.stderr)
+
+
+def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = False, save_path: Optional[str] = None) -> pd.DataFrame:
     """
     Core evaluation logic:
       - verify that required "base" columns are present
@@ -739,6 +906,9 @@ def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = Fal
       - call the chosen model adapter
       - fill per-model 2×2 columns:
           <model>_I0q0_json / <model>_I0q1_json / <model>_I1q0_json / <model>_I1q1_json
+
+    If save_path is provided, saves incrementally after each row to preserve
+    progress in case of errors (e.g., 429 rate limits).
 
     Returns a new DataFrame that preserves all original rows/columns and
     appends the per-model output columns at the end. Rows with Status != 'Done'
@@ -818,12 +988,35 @@ def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = Fal
         raw_q1 = row.get("flip_question", "")
         q1_text = "" if not isinstance(raw_q1, str) else normalize_question(str(raw_q1))
 
-        existing_base = str(row.get(col_i0q0_json, "") or "")
-        existing_flip = str(row.get(col_i1q0_json, "") or "")
-        existing_i0q1 = str(row.get(col_i0q1_json, "") or "")
-        existing_i1q1 = str(row.get(col_i1q1_json, "") or "")
+        # Get existing values, handling NaN properly (pandas reads empty CSV cells as NaN)
+        # Also detect error messages (starting with "ERROR:") and prose responses (no valid JSON) and treat them as incomplete
+        def _get_value(col_name: str) -> str:
+            val = row.get(col_name, "")
+            if pd.isna(val) or val == "" or val is None:
+                return ""
+            val_str = str(val).strip()
+            # Treat error messages as incomplete (need retry)
+            if val_str.startswith("ERROR:"):
+                return ""
+            # Check if it's valid JSON with the expected structure
+            try:
+                import json
+                parsed = json.loads(val_str)
+                if isinstance(parsed, dict) and "label" in parsed:
+                    return val_str  # Valid JSON with label field
+            except:
+                pass
+            # If it's not valid JSON or doesn't have label, and it's long enough to be prose, treat as incomplete
+            if len(val_str) > 50 and not val_str.startswith("{"):
+                return ""  # Likely prose response without JSON, needs retry
+            return val_str
 
-        if only_missing and existing_base.strip() and existing_flip.strip() and existing_i0q1.strip() and existing_i1q1.strip():
+        existing_base = _get_value(col_i0q0_json)
+        existing_flip = _get_value(col_i1q0_json)
+        existing_i0q1 = _get_value(col_i0q1_json)
+        existing_i1q1 = _get_value(col_i1q1_json)
+
+        if only_missing and existing_base and existing_flip and existing_i0q1 and existing_i1q1:
             print(
                 f"[SKIP] id={row_id} reason=already_has_2x2_outputs",
                 file=sys.stderr,
@@ -900,6 +1093,10 @@ def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = Fal
         df_out.at[idx, col_i1q1_json] = out_i1q1
 
         processed_rows += 1
+
+        # Save incrementally after each row to preserve progress on errors
+        if save_path:
+            _save_dataframe(df_out, save_path)
 
     print(
         f"[INFO] Core eval complete: processed_rows={processed_rows} "

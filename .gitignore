@@ -39,6 +39,12 @@ env/
 .DS_Store
 Thumbs.db
 
+# Claude CLI configuration
+.claude/
+
+# Log files
+*.log
+
 Sheets/**/*.csv
 Sheets/**/*.xlsx
 Sheets/**/*.json

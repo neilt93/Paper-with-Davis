@@ -261,7 +261,15 @@ def main() -> None:
             ws.resize(rows=max(ws.row_count, 1), cols=len(header))
             ws.update(range_name="A1", values=[header])
 
-    ws.append_row([row_out[k] for k in header], value_input_option="RAW")
+    # Convert NaN/None to None (which becomes empty cell in Sheets) for JSON serialization
+    import math
+    row_values = []
+    for k in header:
+        val = row_out[k]
+        if val is not None and isinstance(val, float) and math.isnan(val):
+            val = None
+        row_values.append(val)
+    ws.append_row(row_values, value_input_option="RAW")
     print(f"[INFO] Appended score row to sheet '{args.scores_sheet}'", file=sys.stderr)
 
 
