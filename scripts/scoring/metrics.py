@@ -57,8 +57,9 @@ def confidence_aware_accuracy(
 
     Per item:
       - if prediction is correct: score_i = confidence_i
-      - if prediction is wrong:   score_i = 1 - confidence_i
+      - if prediction is wrong:   score_i = 0
 
+    This avoids gaming where low-confidence wrong answers score well.
     Returns the mean score in [0, 1].
     """
     g = _ensure_numpy(gold)
@@ -69,7 +70,7 @@ def confidence_aware_accuracy(
         raise ValueError("gold, pred, and confidence must have the same shape.")
 
     correct = (g == p)
-    scores = np.where(correct, c, 1.0 - c)
+    scores = np.where(correct, c, 0.0)
     return float(scores.mean()) if scores.size else float("nan")
 
 
@@ -92,7 +93,7 @@ def caa_with_abstain_penalty(
     Per item i:
       - if abstain: s_i = alpha
       - else if correct: s_i = c_i
-      - else: s_i = 1 - c_i
+      - else: s_i = 0  (no reward for wrong answers)
 
     Returns mean s_i.
     """
@@ -118,7 +119,7 @@ def caa_with_abstain_penalty(
                 abstain[i] = True
 
     correct = (g == p)
-    scores = np.where(abstain, alpha, np.where(correct, c, 1.0 - c))
+    scores = np.where(abstain, alpha, np.where(correct, c, 0.0))
     return float(scores.mean()) if scores.size else float("nan")
 
 
@@ -293,13 +294,13 @@ def _selective_accuracy_auc(
     return auc
 
 
-def normalized_aurc(
+def selrank(
     gold: Iterable[str],
     pred: Iterable[str],
     confidence: Iterable[float],
 ) -> float:
     """
-    Abstention quality metric (D) via a normalized AURC-style score.
+    Selective Ranking Score (SelRank) - abstention quality metric.
 
     We work with the *selective accuracy* curve A(cov) and define:
 
@@ -340,20 +341,19 @@ def normalized_aurc(
     if not np.isfinite(a_model):
         return float("nan")
 
-    # The normalized quantity is intended to be in [0, 1], but in practice a
-    # model's confidence ranking can be worse than random (yielding < 0) or
-    # numerically overshoot slightly (> 1). Clamp for stability.
+    # The normalized quantity can be negative if the model's confidence ranking
+    # is worse than random (miscalibration). Keep negative values to capture this.
     score = float((a_model - baseline_acc) / max(1e-8, (1.0 - baseline_acc)))
-    return float(max(0.0, min(1.0, score)))
+    return float(min(1.0, score))  # Only cap upper bound
 
 
-def normalized_aurc_answered_only(
+def selrank_answered_only(
     gold: Iterable[str],
     pred: Iterable[Optional[str]],
     confidence: Iterable[Optional[float]],
 ) -> float:
     """
-    AURC-normalized computed *only over answered items*.
+    SelRank computed *only over answered items*.
 
     "Answered" means pred ∈ {"VISIBLE", "NOT_VISIBLE"}.
     "Abstain" (ABSTAIN) items are excluded entirely from the curve.
@@ -375,23 +375,23 @@ def normalized_aurc_answered_only(
     if answered_mask.sum() == 0:
         return float("nan")
 
-    return normalized_aurc(g[answered_mask], p[answered_mask], c[answered_mask])
+    return selrank(g[answered_mask], p[answered_mask], c[answered_mask])
 
 
-def aurc_answered_only_diagnostics(
+def selrank_answered_only_diagnostics(
     gold: Iterable[str],
     pred: Iterable[Optional[str]],
     confidence: Iterable[Optional[float]],
 ) -> Dict[str, float]:
     """
-    Diagnostics for answered-only AURC.
+    Diagnostics for answered-only SelRank.
 
     Returns a dict with:
       - n_answered
       - answered_accuracy (p)
       - A_model (area under selective-accuracy curve)
       - raw_normalized (pre-clamp)
-      - normalized (post-clamp, equals normalized_aurc_answered_only)
+      - normalized (post-clamp, equals selrank_answered_only)
     """
     g = _ensure_numpy(gold)
     p = _ensure_numpy(pred).astype(object)
@@ -429,7 +429,7 @@ def aurc_answered_only_diagnostics(
     else:
         raw_norm = float((a_model - answered_accuracy) / max(1e-8, (1.0 - answered_accuracy)))
 
-    norm = float(max(0.0, min(1.0, raw_norm)))
+    norm = float(min(1.0, raw_norm))  # Allow negative values to indicate miscalibration
 
     return {
         "n_answered": float(n_answered),
@@ -601,7 +601,7 @@ def compute_all_metrics(
     Returns a dict containing:
       - core_confidence_accuracy   (CAA)
       - I_MEFR, T_MEFR, MEFR       (conditional flip rates)
-      - abstention_quality         (AURC-normalized)
+      - abstention_quality         (SelRank)
       - second_order_accuracy      (ToM subset accuracy)
       - ic_strict                  (BASE vs INVARIANT consistency; not in composite)
     """
@@ -627,8 +627,8 @@ def compute_all_metrics(
         relation_col=relation_col,
     )
 
-    # AURC computed over answered-only items; abstentions are excluded from coverage.
-    abst = normalized_aurc_answered_only(gold, pred, conf)
+    # SelRank computed over answered-only items; abstentions are excluded from coverage.
+    abst = selrank_answered_only(gold, pred, conf)
 
     tom_acc = second_order_tom_accuracy(
         df,
@@ -670,7 +670,7 @@ def composite_score(
     Default weights follow the current spec:
       - 70% × Confidence-Aware Accuracy (CAA)
       - 15% × Mean conditional flip rate (MEFR = 0.5 × (I_MEFR + T_MEFR))
-      - 10% × Abstention Quality (AURC-normalized)
+      - 10% × Abstention Quality (SelRank)
       - 5%  × Second-order ToM accuracy
 
     IC_strict is reported separately and *not* included in this composite.

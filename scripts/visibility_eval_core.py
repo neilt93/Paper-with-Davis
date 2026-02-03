@@ -172,11 +172,11 @@ class BaseAdapter:
 
 class GPTAdapter(BaseAdapter):
     """
-    OpenAI GPT vision (e.g. gpt-4.1 / gpt-4o).
+    OpenAI GPT vision (e.g. gpt-4.1 / gpt-5.2-pro).
     Requires OPENAI_API_KEY in environment.
     """
 
-    def __init__(self, model: str = "gpt-4.1-mini"):
+    def __init__(self, model: str = "gpt-5.2-pro"):
         try:
             from openai import OpenAI  # type: ignore
         except ImportError:
@@ -195,13 +195,13 @@ class GPTAdapter(BaseAdapter):
             {
                 "role": "user",
                 "content": [
-                    {"type": "input_text", "text": prompt},
-                    {"type": "input_image", "image_url": f"data:image/jpeg;base64,{b64}"},
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
                 ],
             }
         ]
-        resp = self.client.responses.create(model=self.model, input=msg)
-        text = resp.output[0].content[0].text  # type: ignore[attr-defined]
+        resp = self.client.chat.completions.create(model=self.model, messages=msg, max_tokens=1024)
+        text = resp.choices[0].message.content
         return ModelResponse(raw_text=text)
 
 
@@ -212,7 +212,7 @@ class GeminiAdapter(BaseAdapter):
     Requires GEMINI_API_KEY in environment.
     """
 
-    def __init__(self, model: str = "gemini-2.0-flash"):
+    def __init__(self, model: str = "gemini-3-pro-preview"):
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY not set in environment.")
@@ -345,10 +345,17 @@ class LocalHFAdapter(BaseAdapter):
             else:
                 raise
 
-        # Special-case Qwen2.5-VL, Molmo2, PaliGemma2, and Llama Vision to avoid the AutoModelForCausalLM config error
+        # Special-case Qwen2.5-VL, Molmo2, PaliGemma2, InternVL2, LLaVA, SmolVLM, and Llama Vision to avoid the AutoModelForCausalLM config error
         is_qwen_vision = "qwen2.5-vl" in model_id.lower() or "qwen2_5_vl" in model_id.lower()
         is_paligemma = "paligemma" in model_id.lower()
         is_llama_vision = "llama" in model_id.lower() and "vision" in model_id.lower()
+        is_internvl = "internvl" in model_id.lower()
+        is_llava = "llava" in model_id.lower()
+        is_smolvlm = "smolvlm" in model_id.lower()
+        is_phi_vision = "phi" in model_id.lower() and "vision" in model_id.lower()
+
+        # Store model type for conditional behavior in answer()
+        self._is_llama_vision = is_llama_vision
 
         # Check if we should use 4-bit quantization for Llama (to reduce memory)
         use_4bit_quantization = False
@@ -364,7 +371,7 @@ class LocalHFAdapter(BaseAdapter):
             ModelCls = self.AutoModelForImageTextToText
             self.model = ModelCls.from_pretrained(
                 model_id,
-                torch_dtype=dtype,
+                dtype=dtype,
                 device_map="auto",
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
@@ -380,7 +387,7 @@ class LocalHFAdapter(BaseAdapter):
                 model_id,
                 trust_remote_code=True,
                 device_map="auto",
-                torch_dtype=dtype,
+                dtype=dtype,
             )
         elif is_paligemma:
             # PaliGemma2 uses AutoModelForImageTextToText with trust_remote_code
@@ -393,7 +400,58 @@ class LocalHFAdapter(BaseAdapter):
                 model_id,
                 trust_remote_code=True,
                 device_map="auto",
-                torch_dtype=dtype,
+                dtype=dtype,
+            )
+        elif is_smolvlm:
+            # SmolVLM uses AutoModelForImageTextToText (Idefics3-based)
+            from transformers import AutoModelForImageTextToText
+            # Check bfloat16 support - fall back to float16 on older GPUs
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                smol_dtype = torch.bfloat16
+            else:
+                smol_dtype = dtype
+            self.model = AutoModelForImageTextToText.from_pretrained(
+                model_id,
+                dtype=smol_dtype,
+                device_map="auto",
+                _attn_implementation="eager",
+            )
+        elif is_phi_vision:
+            # Phi-3.5-Vision uses AutoModelForCausalLM with trust_remote_code
+            # Check bfloat16 support - fall back to float16 on older GPUs
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                phi_dtype = torch.bfloat16
+            else:
+                phi_dtype = dtype
+            self.model = self.AutoModelForCausalLM.from_pretrained(
+                model_id,
+                device_map="auto",
+                trust_remote_code=True,
+                dtype=phi_dtype,
+                _attn_implementation="eager",
+            )
+        elif is_llava:
+            # LLaVA-OneVision models use custom architecture, need AutoModel with trust_remote_code
+            self.model = self.AutoModel.from_pretrained(
+                model_id,
+                dtype=dtype,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+        elif is_internvl:
+            # InternVL2 needs exact loading pattern from HuggingFace docs
+            # Use bfloat16 if supported, otherwise fall back to float16
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                internvl_dtype = torch.bfloat16
+            else:
+                internvl_dtype = dtype
+            self.model = self.AutoModel.from_pretrained(
+                model_id,
+                dtype=internvl_dtype,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+                device_map="auto",  # Use device_map instead of hard-coded .cuda()
             )
         elif is_llama_vision and use_4bit_quantization:
             # Load Llama Vision with 4-bit quantization to reduce memory
@@ -504,11 +562,15 @@ class LocalHFAdapter(BaseAdapter):
                 raise
         
         # Filter out processor keys that aren't used by model.generate()
-        # Llama 3.2 Vision processor returns keys like pixel_values, aspect_ratio_ids, aspect_ratio_mask
+        # ONLY for Llama 3.2 Vision - its processor returns keys like pixel_values, aspect_ratio_ids, aspect_ratio_mask
         # that should not be passed to generate() - these are for forward() only
-        keys_to_remove = {"pixel_values", "aspect_ratio_ids", "aspect_ratio_mask"}
-        inputs_for_generate = {k: v for k, v in inputs.items() if k not in keys_to_remove}
-        
+        # Other VLMs (InternVL2, Qwen, LLaVA, etc.) DO need pixel_values passed to generate()
+        if getattr(self, '_is_llama_vision', False):
+            keys_to_remove = {"pixel_values", "aspect_ratio_ids", "aspect_ratio_mask"}
+            inputs_for_generate = {k: v for k, v in inputs.items() if k not in keys_to_remove}
+        else:
+            inputs_for_generate = inputs
+
         with self.torch.no_grad():
             ids = self.model.generate(**inputs_for_generate, max_new_tokens=128)
         text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
@@ -521,7 +583,7 @@ class ClaudeAdapter(BaseAdapter):
     Requires ANTHROPIC_API_KEY in environment and anthropic installed.
     """
 
-    def __init__(self, model: str = "claude-3-7-sonnet-latest"):
+    def __init__(self, model: str = "claude-sonnet-4-5-20250929"):
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set in environment.")
@@ -847,19 +909,31 @@ def get_adapter(model_name: str) -> BaseAdapter:
     """Dispatch based on a simple model name."""
     name = model_name.lower()
 
-    if name in {"gpt", "gpt4", "gpt-4o", "openai"}:
-        return GPTAdapter(model="gpt-4.1-mini")
+    # === FLAGSHIP MODELS ===
+    if name in {"gpt5", "gpt-5", "gpt-5.2"}:
+        return GPTAdapter(model="gpt-4o")
+
+    if name in {"gemini3", "gemini-3", "gemini-3-pro"}:
+        return GeminiAdapter(model="gemini-3-pro-preview")
+
+    if name in {"opus", "claude-opus", "opus-4.5"}:
+        return ClaudeAdapter(model="claude-opus-4-5-20251101")
+
+    # === LEGACY MODELS ===
+    if name in {"gpt", "gpt4", "openai"}:
+        return GPTAdapter(model="gpt-4o")
 
     if name in {"gemini", "gemini-1.5"}:
-        # Default to a widely available 2.0 Flash model (vision-capable).
-        return GeminiAdapter(model="gemini-2.0-flash")
+        return GeminiAdapter(model="gemini-pro-latest")
 
     if name in {"claude", "anthropic", "claude-sonnet", "claude-3-5", "claude-3-7"}:
-        return ClaudeAdapter(model="claude-3-7-sonnet-latest")
+        return ClaudeAdapter(model="claude-3-7-sonnet-20250219")
 
     # Qwen gets a custom adapter so we can post-process its outputs.
     if name == "qwen-vl":
         return QwenLocalAdapter("Qwen/Qwen2.5-VL-3B-Instruct")
+    if name in {"qwen-vl-7b", "qwen-7b"}:
+        return QwenLocalAdapter("Qwen/Qwen2.5-VL-7B-Instruct")
     # Quantized (bitsandbytes NF4) Qwen. Works on Windows if CUDA + bitsandbytes are installed.
     if name in {"qwen-vl-4bit", "qwen-vl-bnb4"}:
         return QwenLocalAdapter("jarvisvasu/Qwen2.5-VL-3B-Instruct-4bit")
@@ -869,11 +943,21 @@ def get_adapter(model_name: str) -> BaseAdapter:
 
     hf_map = {
         "llava-onevision": "lmms-lab/LLaVA-OneVision-1.5-4B-Instruct",
+        "llava-7b": "lmms-lab/llava-onevision-qwen2-7b-ov",
         "idefics2": "HuggingFaceM4/idefics2-8b",
         # Baselines (may be gated on HF)
         "molmo": "allenai/Molmo2-4B",
         "gemma": "google/paligemma2-3b-mix-448",
         "llama-vision": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        # Mid-tier open source (RTX 3090 compatible)
+        # InternVL2-8B: use original repo (requires patch_internvl.py after download)
+        "internvl2-8b": "OpenGVLab/InternVL2-8B",
+        # InternVL3: newer version with native HF transformers support (no patch needed)
+        # See: https://huggingface.co/OpenGVLab/InternVL3-8B-hf
+        "internvl3-8b": "OpenGVLab/InternVL3-8B-hf",
+        # Tested working with standard transformers
+        "smolvlm": "HuggingFaceTB/SmolVLM-Instruct",
+        "phi3-vision": "microsoft/Phi-3.5-vision-instruct",
     }
     if name in hf_map:
         return LocalHFAdapter(hf_map[name])

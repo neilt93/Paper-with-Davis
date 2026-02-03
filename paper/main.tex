@@ -1,0 +1,726 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Avoid em dashes (map Unicode em dash to a simple hyphen)
+\DeclareUnicodeCharacter{2014}{-}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage[numbers]{natbib}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{fvextra}
+\usepackage{microtype}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\sisetup{
+  detect-all,
+  table-number-alignment = center
+}
+
+% More robust line breaking / less overfull boxes
+\emergencystretch=2em
+\fvset{breaklines=true,breakanywhere=true}
+\captionsetup{font=small}
+
+\newcommand{\benchmarkname}{\textsc{VB}}
+\newcommand{\benchlong}{Visibility Benchmark}
+
+% Robust image include: if the file is missing, render a visible placeholder box
+\newcommand{\maybeincludegraphics}[3][]{%
+  \IfFileExists{#2}{%
+    \includegraphics[#1,width=#3]{#2}%
+  }{%
+    \fbox{%
+      \parbox[c][0.12\textheight][c]{#3}{%
+        \centering\scriptsize
+        Image placeholder\\
+        \texttt{\detokenize{#2}}%
+      }%
+    }%
+  }%
+}
+
+
+\title{\benchmarkname: \benchlong{} for Visibility and Perspective Reasoning in Images}
+\author{
+  Neil Tripathi\thanks{Affiliation and email.}
+}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present \benchmarkname, a benchmark for visibility and perspective reasoning in images that explicitly tests whether an AI system can withhold judgement when a human viewer cannot reliably answer. Each example in the benchmark consists of a single photo paired with a short yes/no question about visual evidence, such as whether a sign is readable, whether an object is in view, or whether a person shown in the image can see an object in the image. The AI system is required to output one of three labels (\texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, \texttt{ABSTAIN}) plus a confidence for answered predictions. \benchmarkname{} is organised by a taxonomy of visibility factors and uses a family-based \(2 \times 2\) design over a minimal image edit and a minimal text edit. We evaluate models using confidence-aware accuracy with abstention, minimal-edit flip robustness, and a confidence-ranked selective prediction score, and we include a MULTI\_AGENT / SECOND\_ORDER slice for second-order perspective judgements grounded in a single photo. On 100 families (300 headline items), Gemini 3 Pro achieves the best overall composite score (0.679), followed by GPT-5 (0.656) and LLaVA-OneVision (0.597). We find that text edits are often handled more reliably than minimal image edits, and that confidence calibration varies substantially across models.
+\end{abstract}
+
+\section{Introduction}
+
+Visibility is a prerequisite for safe and reliable image-grounded reasoning. Many visually phrased questions are not answerable from a single photo because the relevant evidence is occluded, out of frame, too small, too dark, washed out by glare, or not visually observable at all. In these cases, systems that guess can appear capable while failing exactly where calibrated withholding of judgement matters.
+
+This paper introduces \benchmarkname, a benchmark designed to quantify whether a system can:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item verify simple visibility claims from one image and a short question,
+  \item respond appropriately to minimal edits that should flip the correct label,
+  \item abstain when a human viewer cannot reliably and confidently answer from the photo.
+\end{itemize}
+
+We additionally include a MULTI\_AGENT / SECOND\_ORDER slice that tests second-order perspective judgements (for example, what one person can infer about what another person can see) from a single photo.
+
+\paragraph{Data release.}
+The full dataset, metadata, and evaluation code are released at:
+\begin{center}
+\url{https://github.com/neilt93/Paper-with-Davis}
+\end{center}
+
+\section{Qualitative examples}
+\label{sec:examples}
+
+Figure~\ref{fig:family_2x2_example} illustrates the \(2 \times 2\) family construction. It reuses two images (\(I^0\) and \(I^1\)) and two questions (\(q^0\) and \(q^1\)) to yield four evaluated cells. If the referenced image files are not present locally, the document will display explicit placeholders instead of failing to compile.
+
+\begin{figure}[p]
+  \centering
+  \small
+  \caption{A single family shown in the full \texorpdfstring{$2\times 2$}{2x2} layout. This figure uses two images and two questions, repeated across cells. To reproduce the figure, copy the corresponding files into \texttt{figs/examples/} using the filenames in the \texttt{\textbackslash maybeincludegraphics} calls.}
+  \label{fig:family_2x2_example}
+
+  \textbf{Family AV-04 (distance/readability).}
+  \begin{subfigure}[t]{0.24\textwidth}
+    \centering
+    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_base.jpeg}{\linewidth}
+    \caption{\textbf{BASE} \((I^0,q^0)\).\\
+    \textbf{Q:} ``Can you read the small text on the laptop?''\\
+    \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\textwidth}
+    \centering
+    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_base.jpeg}{\linewidth}
+    \caption{\textbf{TEXT\_FLIP} \((I^0,q^1)\).\\
+    \textbf{Q:} ``Can you not read the small text on the laptop?''\\
+    \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\textwidth}
+    \centering
+    \maybeincludegraphics{figs/examples/AV-04_flip.jpeg}{\linewidth}
+    \caption{\textbf{IMAGE\_FLIP} \((I^1,q^0)\).\\
+    \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.24\textwidth}
+    \centering
+    \maybeincludegraphics{figs/examples/AV-04_flip.jpeg}{\linewidth}
+    \caption{\textbf{DOUBLE\_FLIP} \((I^1,q^1)\).\\
+    \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+  \end{subfigure}
+\end{figure}
+
+Figure~\ref{fig:category_examples} shows one representative base/flip pair per primary category. Each pair uses the base question \(q^0\) and displays the base image \(I^0\) and the minimally edited image \(I^1\) (the IMAGE\_FLIP cell). For space, we omit the corresponding text-edited question \(q^1\) and the DOUBLE\_FLIP cell, but every family in the released benchmark includes all four cells \((I^a,q^b)\) for \(a,b \in \{0,1\}\) (Section~\ref{subsec:xor}).
+
+\begin{figure}[p]
+  \centering
+  \small
+  \caption{Representative base/flip examples (one family per primary category). Each pair shows the BASE cell \((I^0,q^0)\) and the IMAGE\_FLIP cell \((I^1,q^0)\). Most shown pairs are from the strict XOR headline subset, where BASE is \texttt{VISIBLY\_FALSE} and IMAGE\_FLIP is \texttt{VISIBLY\_TRUE} by construction (Section~\ref{subsec:xor}). The INSUFFICIENT\_CONTEXT pair illustrates a case where the correct label is \texttt{ABSTAIN}.}
+  \label{fig:category_examples}
+
+  % Row 1: LD and OF
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1121.jpeg}{\linewidth}
+  \caption{\textbf{LD-02 BASE.}\\
+  \textbf{Q:} ``Is the sign text clearly readable in this photo?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1122.jpeg}{\linewidth}
+  \caption{\textbf{LD-02 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0673.jpeg}{\linewidth}
+  \caption{\textbf{OF-13 BASE.}\\
+  \textbf{Q:} ``Is the microwave visible in this photo?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0674.jpeg}{\linewidth}
+  \caption{\textbf{OF-13 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}
+
+\vspace{6pt}
+
+% Row 2: OC and GD
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0268.jpeg}{\linewidth}
+  \caption{\textbf{OC-11 BASE.}\\
+  \textbf{Q:} ``Is the room number clearly visible in this photo?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0269.jpeg}{\linewidth}
+  \caption{\textbf{OC-11 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0976.jpeg}{\linewidth}
+  \caption{\textbf{GD-06 BASE.}\\
+  \textbf{Q:} ``Is he clearly looking at the laptop screen?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0983.jpeg}{\linewidth}
+  \caption{\textbf{GD-06 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}
+
+\vspace{6pt}
+
+% Row 3: AV and NV
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0618.jpeg}{\linewidth}
+  \caption{\textbf{AV-01 BASE.}\\
+  \textbf{Q:} ``Is the building number clearly readable in this photo?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0619.jpeg}{\linewidth}
+  \caption{\textbf{AV-01 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1107.jpeg}{\linewidth}
+  \caption{\textbf{NV-08 BASE.}\\
+  \textbf{Q:} ``Is the song title/track info visible in this photo (screen/now playing)?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1108.jpeg}{\linewidth}
+  \caption{\textbf{NV-08 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}
+
+\vspace{6pt}
+
+% Row 4: IC and MA/SO
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1115.jpeg}{\linewidth}
+  \caption{\textbf{IC-05 BASE.}\\
+  \textbf{Q:} ``Is the correct mailbox clearly identifiable in this photo?''\\
+  \textbf{Gold:} \texttt{ABSTAIN}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1116.jpeg}{\linewidth}
+  \caption{\textbf{IC-05 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0883.jpeg}{\linewidth}
+  \caption{\textbf{MA-06 BASE.}\\
+  \textbf{Q:} ``Is he clearly looking at what she is pointing to?''\\
+  \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.24\textwidth}
+  \centering
+  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0886.jpeg}{\linewidth}
+  \caption{\textbf{MA-06 IMAGE\_FLIP.}\\
+  \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
+\end{subfigure}
+
+\end{figure}
+
+\paragraph{Note on \texttt{ABSTAIN} examples.}
+\texttt{ABSTAIN} is a valid gold label in \benchmarkname{} when a careful human cannot decide. The main headline results in Section~\ref{sec:results} focus on the strict XOR headline subset used for score aggregation. \texttt{ABSTAIN}-labelled items are included for completeness and analysis, and we recommend reporting their separate accuracy and abstention rates in future releases.
+
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Unanswerable visual questions and withholding judgement.}
+Davis points out that many questions about images are inherently unanswerable even with perfect vision because the relevant facts can be occluded, outside the frame, or non-visual \citep{davis_unanswerable_images}. Several benchmarks highlight that real images often do not support a definitive answer, due to blur, occlusion, missing context, or out-of-frame evidence. VizWiz collects question--image pairs from blind or vision-impaired users seeking assistance. Many images are low quality or do not contain enough visual evidence to answer the user's question \citep{gurari_vizwiz_2018}. Recent work explicitly evaluates abstention on unanswerable visual questions, for example UNK-VQA \citep{guo_unkvqa_2023} and TUBench \citep{he_tubench_2024}. \benchmarkname{} focuses specifically on visibility and perspective, and uses minimal edits to test whether models change their judgements when evidence changes.
+
+\paragraph{Visibility factors: gaze, occlusion, and field of view.}
+Datasets such as GazeFollow \citep{recasens_gazefollow_2015} and Following Gaze Across Views \citep{recasens_following_gaze_2017} study gaze targets and off-frame gaze. Work on occlusion and visibility cues analyses how blockers and partial views affect recognition and localisation. \benchmarkname{} differs by evaluating label-level support for a visibility claim under controlled edits rather than requiring precise localisation.
+
+\paragraph{Hallucination and faithfulness in vision-language models.}
+Benchmarks such as MME \citep{fu_mme_2023} and POPE \citep{li_pope_2023} evaluate multimodal perception, cognition, and hallucinated object claims. \benchmarkname{} complements these by isolating a narrower but safety-relevant skill: deciding whether a claim is supported by visible evidence, and withholding judgement when it is not.
+
+\paragraph{Selective prediction, reject options, and risk-coverage.}
+Selective classification formalises the trade-off between risk and coverage when a classifier may reject \citep{elyaniv_selective_2010}. SelectiveNet and follow-up work evaluate selective prediction using risk-coverage curves and related summary statistics \citep{geifman_selectivenet_2019,varshney_selective_2022}. \benchmarkname{} uses a confidence-ranked selective prediction score to test whether model confidence aligns with correctness among answered items.
+
+\paragraph{Second-order perspective and theory-of-mind style probes.}
+Recent work motivates stress tests for second-order perspective judgements and their brittleness under structured perturbations \citep{kosinski_tom_llms_2023,ullman_tom_perturbations}. \benchmarkname{} includes a dedicated MULTI\_AGENT / SECOND\_ORDER slice in which the label depends on what the photo supports about one agent's knowledge of another agent's visual access.
+
+\section{Benchmark design}
+\label{sec:design}
+
+\subsection{Task definition and labels}
+
+Each item consists of an image and a short yes/no question that expresses a \emph{visibility claim}. The system's job is to decide whether that claim is supported by visible evidence in the photo.
+
+The label space is:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item \texttt{VISIBLY\_TRUE}: the claim is supported by visible evidence, defined as ``a careful human would answer \emph{yes} from this photo with reasonable confidence'';
+  \item \texttt{VISIBLY\_FALSE}: the claim is contradicted by the photo, defined as ``a careful human would answer \emph{no} from this photo with reasonable confidence'';
+  \item \texttt{ABSTAIN}: the photo does not support either a confident yes or a confident no.
+\end{itemize}
+
+The labels always refer to whether the \emph{question's claim} is supported. This allows both positive and negative question forms, for example ``Is the serial number readable?'' versus ``Is the serial number unreadable?''
+
+\subsection{Structured outputs}
+
+Systems output a single structured prediction:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item \texttt{label} \(\in \{\texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, \texttt{ABSTAIN}\}\),
+  \item \texttt{reason\_code} \(\in \{\)GAZE\_DIRECTION, OCCLUSION, OUT\_OF\_FRAME, LIGHTING\_DISTANCE, INHERENTLY\_NONVISUAL, AUGMENTED\_VISION\_REQUIRED, INSUFFICIENT\_CONTEXT, MULTI\_AGENT\_SECOND\_ORDER, NONE\(\}\),
+  \item \texttt{confidence} \(\in [0,1]\), interpreted as the model's probability that its chosen label is correct.
+\end{itemize}
+
+\paragraph{Reason-code conventions.}
+If \texttt{label}=\texttt{VISIBLY\_TRUE}, set \texttt{reason\_code}=\texttt{NONE}. If \texttt{label}=\texttt{ABSTAIN}, choose exactly one limiting-factor code. If \texttt{label}=\texttt{VISIBLY\_FALSE}, choose a limiting-factor code when the claim is false due to a visibility limitation (for example, ``Is the serial number readable?'' when the serial number is present but blurred). If the claim is directly refuted with no visibility limitation required (for example, ``Is the mug not visible?'' when the mug is plainly visible), set \texttt{reason\_code}=\texttt{NONE}.
+
+\paragraph{Why include \texttt{reason\_code}?}
+Reason codes make failures more actionable and more interpretable. They help distinguish ``the evidence is missing'' (out of frame) from ``the evidence is present but blocked'' (occlusion) or ``present but too small'' (distance), which correspond to different corrective actions (change viewpoint, remove blocker, move closer, increase illumination, or gather context).
+
+\paragraph{Choosing a single code.}
+If multiple limiting factors apply, we use the following precedence to select one:
+\begin{quote}
+\begin{Verbatim}[fontsize=\small,breaklines=true]
+OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION > LIGHTING_DISTANCE >
+AUGMENTED_VISION_REQUIRED > INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT >
+MULTI_AGENT_SECOND_ORDER
+\end{Verbatim}
+\end{quote}
+The same precedence is included in the evaluation prompt in Section~\ref{sec:prompt}.
+
+\subsection{Family structure: \(2 \times 2\) design}
+
+Items are grouped into families. Each family is built around:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item a base image \(I^0\) and an edited image \(I^1\) that differs by one atomic scene change,
+  \item a base question \(q^0\) and a text-edited question \(q^1\) that flips the underlying claim being tested.
+\end{itemize}
+
+This yields four evaluated cells \((I^a, q^b)\) for \(a,b \in \{0,1\}\):
+\[
+(I^0,q^0),\ (I^0,q^1),\ (I^1,q^0),\ (I^1,q^1).
+\]
+
+\subsection{Atomic scene changes (minimal image edits)}
+\label{subsec:atomic}
+
+An \emph{atomic scene change} is a minimal change to the photographed world intended to affect exactly one visibility factor relevant to the family claim, while leaving the remainder of the scene as stable as possible. In practice, families were re-shot rather than digitally edited, and the atomic change was enacted physically (for example, moving closer to a screen, shifting an occluder, or moving a target slightly into frame).
+
+We aim for the following constraints:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item \textbf{Single causal factor:} the edit targets one visibility factor (for example occlusion or distance) for the referent used in the question.
+  \item \textbf{No incidental cues:} no new salient objects are introduced unless they are the edit itself (for example the occluder being moved).
+  \item \textbf{Stable viewpoint:} camera position and framing are held fixed unless the family tests OUT\_OF\_FRAME or LIGHTING\_DISTANCE and requires a controlled viewpoint change.
+  \item \textbf{Stable lighting:} lighting conditions are held fixed unless the family targets LIGHTING\_DISTANCE.
+\end{itemize}
+
+The DOUBLE\_FLIP cell (Section~\ref{subsec:xor}) provides a diagnostic for unintended interactions, since composing the text and image edits should re-invert the claim under the intended construction.
+
+\subsection{XOR construction and the diagnostic fourth cell}
+\label{subsec:xor}
+
+For the strict headline subset used in the main score, families are constructed so that the gold labels follow a fixed XOR pattern over the two edits:
+\[
+y^{00}=\texttt{VISIBLY\_FALSE},\quad
+y^{01}=\texttt{VISIBLY\_TRUE},\quad
+y^{10}=\texttt{VISIBLY\_TRUE},\quad
+y^{11}=\texttt{VISIBLY\_FALSE}.
+\]
+Intuitively, the base cell is designed to be confidently refuted by the photo, while either a text edit alone or an image edit alone makes the claim supported. When both edits are applied, the claim is again refuted.
+
+We treat the first three cells as \textbf{headline cells} for the main score:
+\[
+(I^0,q^0)\ \text{BASE},\quad (I^0,q^1)\ \text{TEXT\_FLIP},\quad (I^1,q^0)\ \text{IMAGE\_FLIP}.
+\]
+The fourth cell \((I^1,q^1)\) (\textbf{DOUBLE\_FLIP}) is \textbf{diagnostic only}. We report it separately and do not include it in the composite headline score.
+
+\subsection{Primary categories}
+
+\benchmarkname{} is organised around mutually exclusive primary visibility factors at the family level. Each base image is tagged with exactly one primary category.
+
+\begin{table}[t]
+  \centering
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \caption{Primary category label on each scene, what it tests, an example prompt (written to avoid encoding the category in the question text), and the number of base pictures in the current release.}
+  \label{tab:categories}
+  \resizebox{\linewidth}{!}{%
+  \begin{tabular}{l p{3.2cm} p{4.6cm} S[table-format=3.0]}
+    \toprule
+    \textbf{Category (primary label on scene)} & \textbf{What it tests} & \textbf{Example prompt (short)} & \textbf{\# Base Pictures} \\
+    \midrule
+    GAZE\_DIRECTION & Head and eye orientation versus target & ``Is Pat looking at the mug?'' & 20 \\
+    OCCLUSION & Opaque blockers along line of sight & ``Is the metal key blade visible?'' & 20 \\
+    OUT\_OF\_FRAME & Target outside current view or crop & ``Is the dog visible in the photo?'' & 16 \\
+    LIGHTING\_DISTANCE & Darkness, glare, or distance limits & ``Is the sign text readable?'' & 13 \\
+    INHERENTLY\_NONVISUAL & Properties vision cannot reveal & ``Is the device PIN visible anywhere?'' & 10 \\
+    AUGMENTED\_VISION\_REQUIRED & Requires magnification not available from the base photo & ``Is the fine print readable?'' & 7 \\
+    INSUFFICIENT\_CONTEXT & Under-specified referents or missing scene facts & ``Is the correct key visible?'' & 7 \\
+    MULTI\_AGENT / SECOND\_ORDER & Second-order perspective judgements grounded in one photo & ``Does Bob know Alice cannot see the card?'' & 7 \\
+    \midrule
+    \textbf{TOTAL} & & & 100 \\
+    \bottomrule
+  \end{tabular}%
+  }
+\end{table}
+
+\subsection{Multi-agent and second-order visibility}
+\label{subsec:multiagent}
+
+The MULTI\_AGENT / SECOND\_ORDER subset targets second-order judgements, where the system must decide whether the photo supports a claim about one agent's knowledge of another agent's visual access.
+
+\paragraph{Writing rule (referents must be clear).}
+SECOND\_ORDER questions name agents and targets explicitly (for example ``Bob'', ``Alice'', and ``the card''), rather than relying on pronouns. If the referent would be unclear to a careful human, the intended gold label is \texttt{ABSTAIN} (reason code \texttt{INSUFFICIENT\_CONTEXT}).
+
+\paragraph{Construction principle.}
+SECOND\_ORDER families follow the same \(2 \times 2\) structure. For the strict headline subset, we use the XOR pattern in Section~\ref{subsec:xor}. For additional \texttt{ABSTAIN}-labelled families, we require that independent annotators agree that a careful human cannot answer from the photo.
+
+\subsection{Data collection}
+
+All images were collected by the authors in and around the NYU campus. Indoor scenes were photographed in student dormitory spaces (bedrooms, kitchens, laundry rooms, corridors, stairwells, and common areas). Outdoor scenes were photographed in the surrounding city (pavements, street crossings, car parks, and neighbourhood parks). Images were captured at approximately human eye height using a smartphone camera. The release includes per-image metadata and editing provenance.
+
+\section{Evaluation and scoring}
+\label{sec:evaluation}
+
+\subsection{Gold labels and cells}
+
+For the strict XOR headline subset, gold labels are fixed by construction (Section~\ref{subsec:xor}). We refer to the four cells as:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item \texttt{BASE}: \((I^0, q^0)\) with gold \texttt{VISIBLY\_FALSE}
+  \item \texttt{TEXT\_FLIP}: \((I^0, q^1)\) with gold \texttt{VISIBLY\_TRUE}
+  \item \texttt{IMAGE\_FLIP}: \((I^1, q^0)\) with gold \texttt{VISIBLY\_TRUE}
+  \item \texttt{DOUBLE\_FLIP}: \((I^1, q^1)\) with gold \texttt{VISIBLY\_FALSE} (diagnostic)
+\end{itemize}
+
+Models may output \texttt{ABSTAIN} when they cannot decide with reasonable confidence from the image and question.
+
+\subsection{Confidence-aware accuracy with abstention (CAA)}
+\label{subsec:caa}
+
+Let item \(i\) have gold label \(y_i \in \{\texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}\}\). A model outputs \(\hat{y}_i \in \{\texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, \texttt{ABSTAIN}\}\) and a confidence \(\hat{c}_i \in [0,1]\). (For evaluation, \(\hat{c}_i\) is used only when \(\hat{y}_i \neq \texttt{ABSTAIN}\).)
+
+We define confidence-aware accuracy with abstention (CAA) using a partial credit parameter \(\alpha \in [0,1]\):
+\[
+\text{score}_i =
+\begin{cases}
+\alpha & \text{if } \hat{y}_i=\texttt{ABSTAIN},\\
+\hat{c}_i & \text{if } \hat{y}_i=y_i,\\
+0 & \text{if } \hat{y}_i\neq y_i \text{ and } \hat{y}_i\neq \texttt{ABSTAIN}.
+\end{cases}
+\]
+Then
+\[
+\text{CAA}=\frac{1}{N}\sum_{i=1}^{N}\text{score}_i.
+\]
+
+\paragraph{Justification.}
+CAA rewards high confidence when correct, gives zero credit for incorrect answers regardless of confidence, and gives fixed partial credit for abstention. This avoids a gaming vulnerability where low-confidence wrong answers could score well under alternative formulations. The design is inspired by the selective prediction literature, where models trade coverage for reduced risk \citep{elyaniv_selective_2010,geifman_selectivenet_2019}. We use \(\alpha=0.25\) by default to give abstention a small but non-trivial value, reflecting that withholding judgement can be preferable to a guess in safety-relevant settings.
+
+Headline CAA is computed on the three headline cells only (\texttt{BASE}, \texttt{TEXT\_FLIP}, \texttt{IMAGE\_FLIP}).
+
+\subsection{Minimal edit flip rates (MEFR)}
+
+We measure sensitivity to minimal edits along each axis, conditioning on correctness of the base cell. For correctness checks, \texttt{ABSTAIN} counts as incorrect.
+
+Let \(c^{ab}_f=\mathbf{1}[\hat{y}^{ab}_f=y^{ab}_f]\) for family \(f\) and cell \((a,b)\).
+
+\[
+\text{I\_MEFR}=
+\frac{\sum_{f=1}^{F}\mathbf{1}\big[c^{00}_f=1 \land c^{10}_f=1\big]}
+{\sum_{f=1}^{F}\mathbf{1}\big[c^{00}_f=1\big]},
+\quad
+\text{T\_MEFR}=
+\frac{\sum_{f=1}^{F}\mathbf{1}\big[c^{00}_f=1 \land c^{01}_f=1\big]}
+{\sum_{f=1}^{F}\mathbf{1}\big[c^{00}_f=1\big]}.
+\]
+\[
+\text{MEFR}=\tfrac{1}{2}(\text{I\_MEFR}+\text{T\_MEFR}).
+\]
+
+\paragraph{Denominators.}
+Because MEFR conditions on correctness of the BASE cell, the effective denominator (the number of families with correct BASE predictions) can vary across models, especially when abstention is frequent. We report MEFR denominators alongside selective prediction diagnostics in Table~\ref{tab:selective_diag}.
+
+\subsection{Confidence-ranked selective prediction score (SelRank)}
+\label{subsec:selrank}
+
+We evaluate selective prediction using confidence-ranked answering on headline cells. We consider only \emph{answered} predictions (\texttt{VISIBLY\_TRUE} or \texttt{VISIBLY\_FALSE}) and exclude \texttt{ABSTAIN} from coverage.
+
+Sort answered items by confidence in descending order. For each prefix length \(k\), compute coverage \(\mathrm{cov}(k)=k/n\) and answered accuracy \(\mathrm{acc}(k)\). Let \(A_{\text{model}}\) be the area under the answered accuracy versus coverage curve (trapezoidal rule). Let \(p\) be the overall answered accuracy (the flat baseline).
+
+This is closely related to the standard area under the risk-coverage curve (AURC) used in selective classification \citep{elyaniv_selective_2010,varshney_selective_2022}, since \(\mathrm{risk}(k)=1-\mathrm{acc}(k)\). We use a normalised ``gain'' formulation where higher is better (unlike standard AURC where lower is better), and name it SelRank to avoid confusion.
+
+We report a normalised score (upper-capped at \(1\)):
+\[
+\mathrm{SelRank}=\min\left(1,\ \frac{A_{\text{model}}-p}{1-p}\right).
+\]
+This value is \(0\) when confidence ranking is no better than the flat baseline, and increases when higher confidence corresponds to higher correctness. Negative values indicate that confidence ranking is \emph{anti}-informative (lower-confidence answers tend to be more correct).
+
+\subsection{Multi-agent / second-order accuracy (ToMAcc)}
+
+On the MULTI\_AGENT / SECOND\_ORDER strict subset, we report:
+\[
+\text{ToMAcc}=\frac{\text{number of correct predictions on SECOND\_ORDER items}}{\text{total number of SECOND\_ORDER items}}.
+\]
+For ToMAcc, \texttt{ABSTAIN} counts as incorrect.
+
+\subsection{Double flip diagnostic accuracy (DFAcc)}
+
+We report diagnostic accuracy on the DOUBLE\_FLIP cell:
+\[
+\text{DFAcc}=\frac{\text{number of correct predictions on DOUBLE\_FLIP}}{\text{total number of DOUBLE\_FLIP items evaluated}}.
+\]
+DFAcc is reported separately and is not included in the final composite score.
+
+\subsection{Final composite score}
+
+The final benchmark score combines four headline components with fixed weights:
+\[
+\text{FinalScore}=0.70\cdot \text{CAA}
++0.15\cdot \text{MEFR}
++0.10\cdot \text{SelRank}
++0.05\cdot \text{ToMAcc}.
+\]
+
+\paragraph{Weight choice.}
+These coefficients reflect a prioritisation: correctness with calibrated abstention is the primary objective, robustness to minimal edits is next, confidence ranking for selective answering is third, and second-order performance is included as a small but distinct capability axis. We therefore report all component metrics and encourage alternative weightings for different application priorities.
+
+If no SECOND\_ORDER items are present in an evaluation run, weights are renormalised over the remaining terms.
+
+\section{Prompt template}
+\label{sec:prompt}
+
+We used a single, explicit instruction block (provided as the user message) to standardise how models interpret the task, handle ambiguity, and format outputs. Two parts of the prompt deserve emphasis. First, the referring-expression rules ensure that the target entity can be identified from the image plus the question text alone, without any hidden annotation channel (such as arrows or markings). Second, the instruction ``Do not require arrows, circles, or any on-image markings'' clarifies that the benchmark does not assume any visual markup; questions must be answerable from the unedited photo.
+
+The prompt is shown verbatim below, with \texttt{\{question\}} substituted per item.
+
+\begin{quote}
+\begin{Verbatim}[fontsize=\footnotesize,breaklines=true]
+You are given one photo and one question. Decide whether the question's claim is true using only pixels in this photo. Do not guess and do not use world knowledge.
+
+Observer
+
+The observer is the camera unless the question explicitly names a person in the image as the observer.
+
+How to interpret questions
+
+Treat questions like "Is X visible/readable/clear?" or "Is person A looking at X?" as a true/false claim you must judge from the image.
+
+For open-ended content questions (eg "what's in the box?", "what time is it?"), convert them into: "Is that information visually determinable from this photo right now?"
+
+Referring expressions (who is "he/she/they/it")
+
+Do not require arrows, circles, or any on-image markings.
+
+If the question uses pronouns or vague references, you must be able to identify the referent unambiguously from the image plus the question text alone.
+
+Acceptable disambiguation: only one plausible referent exists, or the question uniquely specifies it via clear visual descriptors (eg "the man on the left", "the woman in the red jacket", "the cat on the sofa").
+
+If multiple referents are plausible and the text does not uniquely pick one, choose ABSTAIN with reason_code=INSUFFICIENT_CONTEXT.
+
+Output format
+Return exactly one minified JSON object (no prose, no markdown, no trailing commas) with keys in this order:
+{"label":"VISIBLY_TRUE|VISIBLY_FALSE|ABSTAIN","reason_code":"GAZE_DIRECTION|OCCLUSION|OUT_OF_FRAME|LIGHTING_DISTANCE|INHERENTLY_NONVISUAL|AUGMENTED_VISION_REQUIRED|INSUFFICIENT_CONTEXT|MULTI_AGENT_SECOND_ORDER|NONE","confidence":number}
+
+Label meanings
+
+VISIBLY_TRUE: the claim in the question is clearly true from pixels.
+
+VISIBLY_FALSE: the claim in the question is clearly false from pixels.
+
+ABSTAIN: you cannot decide true vs false with reasonable confidence from this image.
+
+Reason codes
+
+If label="VISIBLY_TRUE", set reason_code="NONE".
+
+If label="ABSTAIN", pick exactly one reason_code explaining what prevents a decision.
+
+If label="VISIBLY_FALSE":
+
+If the claim is false because the opposite is clearly true (eg the question asserts "not visible" but it is plainly visible), you may set reason_code="NONE".
+
+Otherwise pick exactly one limiting-factor reason_code explaining why the claim is false.
+
+Precedence if multiple apply:
+OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION > LIGHTING_DISTANCE > AUGMENTED_VISION_REQUIRED > INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT > MULTI_AGENT_SECOND_ORDER
+
+Transparent clear glass is non-occluding; frosted/translucent counts as occluding for recognition.
+
+Confidence
+
+Confidence is your probability that your chosen label is correct (0.0 to 1.0).
+
+Use your own internal thresholding. If you cannot decide with reasonable confidence, choose ABSTAIN.
+
+Question: {question}
+\end{Verbatim}
+\end{quote}
+
+\section{Experimental setup}
+\label{sec:setup}
+
+We evaluated nine vision-language models on \benchmarkname{}, including four current flagship models and five prior-generation or smaller variants:
+\begin{itemize}[noitemsep, topsep=3pt]
+  \item \textbf{Flagship models:} Gemini 3 Pro (Google), GPT-5 (OpenAI), Claude Opus 4.5 (Anthropic), LLaVA-OneVision (open-source) \citep{liu_llava_onevision_2024}
+  \item \textbf{Prior-generation:} GPT-4o (OpenAI), Claude 3.7 Sonnet (Anthropic), Gemini 1.5 (Google)
+  \item \textbf{Smaller open-source:} Qwen2-VL-7B \citep{qwen2_vl_2024}, InternVL2-2B
+\end{itemize}
+
+All models were queried with the prompt in Section~\ref{sec:prompt}. For each family, we ran the four cells (BASE, TEXT\_FLIP, IMAGE\_FLIP, DOUBLE\_FLIP). Headline metrics used the first three cells only, yielding \(3F=300\) scored headline items per model. We used \(\alpha=0.25\) for CAA. SelRank was computed on answered items only, with \texttt{ABSTAIN} excluded from coverage.
+
+Open-source models (LLaVA-OneVision, Qwen2-VL-7B, InternVL2-2B) were run on a single NVIDIA RTX 3090 GPU (24GB VRAM) using RunPod cloud infrastructure.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Overall performance}
+
+Table~\ref{tab:main_results} reports the main results on the strict headline subset. Among flagship models, Gemini 3 Pro achieves the highest overall \textsc{FinalScore} (0.679), followed by GPT-5 (0.656) and LLaVA-OneVision (0.597). Claude Opus 4.5 (0.518) forms a middle tier. Prior-generation models GPT-4o (0.631), Claude 3.7 Sonnet (0.473), and Gemini 1.5 (0.431) score below their flagship successors. Smaller open-source models Qwen2-VL-7B (0.440) and InternVL2-2B (0.316) also score in this range.
+
+Abstention behaviour varies substantially across models. Gemini 1.5 abstains most frequently (59 of 300 headline items), followed by InternVL2-2B (52), while Gemini 3 Pro abstains least (11 of 300). Because CAA awards partial credit for abstention, we report abstention counts alongside all headline metrics.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{Headline results on \benchmarkname{} (300 scored headline items per model). CAA uses \(\alpha=0.25\). SelRank is a normalised selective ranking score on answered items (negative values indicate anti-informative confidence ranking). \texttt{ABS} is the number of abstentions among the 300 headline items. Models above the mid-rule are current flagships; those below are prior-generation or smaller variants.}
+\label{tab:main_results}
+\begin{tabular}{l
+S[table-format=1.3]
+S[table-format=1.3]
+S[table-format=1.3]
+S[table-format=1.3]
+S[table-format=1.3]
+S[table-format=2.3]
+S[table-format=1.3]
+S[table-format=2.0]
+}
+\toprule
+\textbf{Model} & {\textbf{Final}} & {\textbf{CAA}} & {\textbf{I\_MEFR}} & {\textbf{T\_MEFR}} & {\textbf{MEFR}} & {\textbf{SelRank}} & {\textbf{ToMAcc}} & {\textbf{ABS}} \\
+\midrule
+Gemini 3 Pro      & 0.679 & 0.716 & 0.570 & 0.826 & 0.698 &  0.313 & 0.833 & 11 \\
+GPT-5             & 0.656 & 0.718 & 0.593 & 0.852 & 0.722 &  0.014 & 0.875 & 15 \\
+LLaVA-OneVision   & 0.597 & 0.653 & 0.595 & 0.919 & 0.757 & -0.006 & 0.542 & 30 \\
+Claude Opus 4.5   & 0.518 & 0.543 & 0.423 & 0.654 & 0.539 &  0.256 & 0.625 & 19 \\
+\midrule
+GPT-4o            & 0.631 & 0.695 & 0.583 & 0.889 & 0.736 & -0.098 & 0.875 & 17 \\
+Claude 3.7 Sonnet & 0.473 & 0.516 & 0.439 & 0.561 & 0.500 &  0.098 & 0.542 & 25 \\
+Gemini 1.5        & 0.431 & 0.490 & 0.565 & 0.391 & 0.478 & -0.066 & 0.458 & 59 \\
+Qwen2-VL-7B       & 0.440 & 0.481 & 0.356 & 0.384 & 0.370 &  0.233 & 0.500 & 37 \\
+InternVL2-2B      & 0.316 & 0.367 & 0.382 & 0.000 & 0.191 &  0.146 & 0.304 & 52 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Minimal edit sensitivity}
+
+Across models, TEXT\_FLIP performance (T\_MEFR) generally exceeds IMAGE\_FLIP performance (I\_MEFR), suggesting that many failures come from visual sensitivity rather than parsing the text edit. This asymmetry is strongest for LLaVA-OneVision, which attains high T\_MEFR (0.919) but lower I\_MEFR (0.595). GPT-5 shows a similar pattern (0.852 versus 0.593). InternVL2-2B shows the most extreme asymmetry: T\_MEFR of 0.000 indicates complete failure on text-flipped questions while maintaining some I\_MEFR (0.382).
+
+Gemini 3 Pro and GPT-5 show the most balanced and highest overall MEFR scores (0.698 and 0.722 respectively), indicating robust handling of both edit types.
+
+\subsection{Abstention, coverage, and confidence ranking}
+
+Since SelRank is answered-only, it is useful to also report answered coverage and answered accuracy. Table~\ref{tab:selective_diag} reports answered fraction, answered-only accuracy, the MEFR denominator (families where BASE is correct), and the raw normalised SelRank.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{Selective prediction and MEFR diagnostics on headline items. \textbf{Answered} counts non-\texttt{ABSTAIN} outputs among 300 headline items. \textbf{Coverage} is answered/300. \textbf{AnsAcc} is accuracy on answered items only. \textbf{SelRank$_{\text{raw}}$} is the normalised selective ranking score before clamping. \textbf{MEFR d} is the number of families with correct BASE prediction. Models above the mid-rule are current flagships; those below are prior-generation or smaller variants.}
+\label{tab:selective_diag}
+\begin{tabular}{l
+S[table-format=3.0]
+S[table-format=2.1]
+S[table-format=1.3]
+S[table-format=2.3]
+S[table-format=2.0]
+}
+\toprule
+\textbf{Model} & {\textbf{Answered}} & {\textbf{Cov (\%)}} & {\textbf{AnsAcc}} & {\textbf{SelRank$_{\text{raw}}$}} & {\textbf{MEFR d}} \\
+\midrule
+Gemini 3 Pro      & 289 & 96.3 & 0.754 &  0.313 & 86 \\
+GPT-5             & 285 & 95.0 & 0.775 &  0.014 & 81 \\
+LLaVA-OneVision   & 270 & 90.0 & 0.730 & -0.006 & 37 \\
+Claude Opus 4.5   & 281 & 93.7 & 0.641 &  0.256 & 78 \\
+\midrule
+GPT-4o            & 283 & 94.3 & 0.753 & -0.098 & 72 \\
+Claude 3.7 Sonnet & 275 & 91.7 & 0.582 &  0.098 & 66 \\
+Gemini 1.5        & 235 & 78.3 & 0.630 & -0.066 & 46 \\
+Qwen2-VL-7B       & 263 & 87.7 & 0.540 &  0.233 & 73 \\
+InternVL2-2B      & 224 & 74.7 & 0.415 &  0.146 & 35 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several patterns emerge. First, GPT-5 achieves the highest answered-only accuracy (0.775) with high coverage (95.0\%), but its SelRank is near zero (0.014), indicating that confidence scores do not meaningfully rank correctness. Second, Gemini 3 Pro shows the best confidence calibration (SelRank 0.313), meaning higher-confidence answers tend to be more accurate. Third, LLaVA-OneVision has only 37 families with correct BASE predictions (MEFR d), indicating frequent over-prediction of visibility on BASE cells despite reasonable overall accuracy. Among legacy models, GPT-4o achieves comparable answered accuracy to GPT-5 (0.753 vs 0.775) but with worse calibration (SelRank $-0.098$), suggesting that confidence ranking has improved in the newer model generation. Gemini 1.5 abstains most frequently among closed-source models (59 abstentions, 78.3\% coverage), achieving reasonable answered accuracy (0.630) but low overall scores due to limited coverage.
+
+\subsection{Multi-agent and second-order subset}
+
+ToMAcc is computed on the MULTI\_AGENT / SECOND\_ORDER slice (8 families, 24 headline items). GPT-5 and GPT-4o tie for best performance on this subset (both 0.875), followed by Gemini 3 Pro (0.833). Claude Opus 4.5 scores 0.625, Claude 3.7 Sonnet and LLaVA-OneVision both score 0.542, Qwen2-VL-7B scores 0.500, Gemini 1.5 scores 0.458, and InternVL2-2B scores lowest (0.304). The strong performance of flagship closed-source models on second-order reasoning is notable, with GPT-5, GPT-4o and Gemini 3 Pro substantially outperforming both open-source alternatives and prior-generation models.
+
+\paragraph{Confidence intervals.} With only 24 items, ToMAcc estimates have wide confidence intervals. Using Wilson's method, the 95\% CI for ToMAcc = 0.875 (21/24) is approximately [0.68, 0.96], and for ToMAcc = 0.500 (12/24) is approximately [0.30, 0.70]. Rankings within this subset should be interpreted cautiously; expanding the SECOND\_ORDER slice is a priority for future dataset releases.
+
+\subsection{Diagnostic: double flip}
+
+We also record DOUBLE\_FLIP behaviour \((I^1,q^1)\) for diagnosis, but it is not included in \textsc{FinalScore}. The DOUBLE\_FLIP cell can identify families where composing edits yields unexpected interactions, or where an intended atomic edit incidentally changes additional visibility factors. In this release we treat DOUBLE\_FLIP primarily as a diagnostic signal and leave systematic family auditing based on DOUBLE\_FLIP to future work.
+
+\subsection{Open-source versus closed-source}
+
+The results show a clear performance gap between flagship closed-source models and open-source alternatives. Gemini 3 Pro (0.679) and GPT-5 (0.656) substantially outperform all open-source models, with LLaVA-OneVision (0.597) being the strongest open-source contender. The gap is particularly pronounced on second-order reasoning (ToMAcc), where GPT-5 (0.875) and Gemini 3 Pro (0.833) far exceed open-source models.
+
+Among open-source models, LLaVA-OneVision demonstrates competitive performance on text-flip robustness (T\_MEFR 0.919, highest among all models) but lags on confidence calibration. Smaller models like InternVL2-2B (2B parameters) struggle substantially, particularly on text understanding (T\_MEFR 0.000).
+
+\section{Discussion}
+
+\benchmarkname{} is designed to make visibility, answerability, and abstention measurable under controlled perturbations. The \(2 \times 2\) family structure probes two complementary sensitivities: changing the text claim while holding the image fixed, and changing the image evidence while holding the question fixed. The headline score focuses on these three cells, while the double flip is retained for diagnostic analysis of compositional effects. The MULTI\_AGENT / SECOND\_ORDER slice further isolates second-order perspective judgements that can fail even when first-order verification is straightforward.
+
+The results highlight several findings. First, flagship closed-source models (Gemini 3 Pro, GPT-5) substantially outperform open-source alternatives across most metrics, with particularly large gaps on second-order reasoning. Second, text-flip robustness (T\_MEFR) tends to exceed image-flip robustness (I\_MEFR) across most models, suggesting that visual sensitivity to minimal evidence changes remains a key challenge. Third, confidence calibration varies substantially: Gemini 3 Pro shows informative confidence ranking (SelRank 0.313), while GPT-5's confidence scores are nearly uninformative for selective prediction despite high accuracy.
+
+\paragraph{Limitations and scope.}
+The current release is modest in scale (100 families) and collected in a narrow set of environments (campus and nearby streets), so results may not fully represent performance in other settings. The benchmark uses short yes/no questions to tightly control claims, which improves interpretability but does not cover longer multi-step reasoning. Finally, the composite score uses fixed weights to reflect one set of priorities; we emphasise component metrics to support alternative weighting choices.
+
+\paragraph{Implications.}
+Visibility reasoning is a prerequisite for safe image-grounded behaviour. The observed gaps between flagship and open-source models suggest that this capability scales with model size and training investment. The variability in confidence calibration indicates that systems should be evaluated not only on correctness, but also on whether they express uncertainty in ways that support selective answering.
+
+\section{Conclusion}
+
+We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. In an evaluation of nine vision-language models across 100 families, we find that flagship closed-source models (Gemini 3 Pro, GPT-5) substantially outperform open-source alternatives, with the largest gaps on second-order reasoning. We also find that text-flip robustness often exceeds image-flip robustness, and that confidence calibration varies substantially across models. \benchmarkname{} provides a focused stress test for evidence-grounded image understanding and calibrated withholding of judgement from a single photo.
+
+\section*{Acknowledgements}
+I thank Ernest Davis for detailed feedback on benchmark design, paper presentation, and evaluation methodology.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

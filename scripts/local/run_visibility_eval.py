@@ -9,12 +9,33 @@ import os
 import sys
 from pathlib import Path
 
-# Ensure the `scripts` directory (where visibility_eval_core.py lives) is on sys.path
-SCRIPT_ROOT = Path(__file__).resolve().parents[1]  # .../scripts
-if str(SCRIPT_ROOT) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_ROOT))
+# --- Fix 1: Robust sys.path logic that searches for visibility_eval_core.py ---
+THIS_FILE = Path(__file__).resolve()
+
+
+def _add_core_dir_to_syspath():
+    """Search up from this script for visibility_eval_core.py and add to sys.path."""
+    for p in [THIS_FILE.parent, *THIS_FILE.parents]:
+        if (p / "visibility_eval_core.py").exists():
+            if str(p) not in sys.path:
+                sys.path.insert(0, str(p))
+            return
+    raise ImportError(
+        f"Could not locate visibility_eval_core.py near {THIS_FILE}. "
+        "Make sure it is in the same directory as this script or a parent directory."
+    )
+
+
+_add_core_dir_to_syspath()
 
 from visibility_eval_core import load_table, run_on_dataframe
+
+
+# --- Fix 2: Sanitize model names for safe filenames (no slashes) ---
+def _safe_tag(s: str) -> str:
+    """Convert model name to filesystem-safe tag (no slashes, spaces, etc.)."""
+    s = s.strip()
+    return "".join(c if (c.isalnum() or c in "._-") else "_" for c in s).strip("_")
 
 
 def main():
@@ -48,11 +69,17 @@ def main():
         print(f"[ERROR] Input file not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
+    # Sanitize model name for filenames (HF repo IDs like "Qwen/Qwen2-VL" have slashes)
+    model_tag = _safe_tag(args.model)
+
     # Determine output path early so we can use it for incremental saving
     out_path = args.out
     if out_path is None:
-        base, ext = os.path.splitext(args.input)
-        out_path = f"{base}.{args.model}.vlm.csv"
+        base, _ = os.path.splitext(args.input)
+        out_path = f"{base}.{model_tag}.vlm.csv"
+
+    # --- Fix 3: Create output directory if it doesn't exist ---
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
 
     # If output file exists and we're using --only-missing, load it to preserve existing results
     if args.only_missing and os.path.exists(out_path):
@@ -60,26 +87,35 @@ def main():
             print(f"[INFO] Loading existing output file to preserve progress: {out_path}", file=sys.stderr)
             df_output = load_table(out_path)
             df_input = load_table(args.input)
-            
-            # Use input as base, but preserve output columns from existing file
-            # Merge on 'id' column if it exists, otherwise use index
+
+            # --- Fix 4: Robust merge that handles overlapping columns ---
             df = df_input.copy()
-            if "id" in df_output.columns and "id" in df.columns:
-                # Merge on id to preserve existing outputs
-                output_cols = [col for col in df_output.columns if col not in df.columns]
-                if output_cols:
-                    df_output_subset = df_output[["id"] + output_cols].set_index("id")
-                    df = df.set_index("id")
-                    for col in output_cols:
-                        if col in df_output_subset.columns:
-                            df[col] = df_output_subset[col]
-                    df = df.reset_index()
+
+            if "id" in df.columns and "id" in df_output.columns:
+                # Merge on id, using suffixes to handle overlapping columns
+                df = df.merge(df_output, on="id", how="left", suffixes=("", "__old"))
+
+                for col in df_output.columns:
+                    if col == "id":
+                        continue
+                    old_col = f"{col}__old"
+                    if old_col in df.columns:
+                        if col in df.columns:
+                            # Fill empty/NaN values in df[col] from the old output
+                            df[col] = df[col].where(
+                                df[col].notna() & (df[col] != ""),
+                                df[old_col]
+                            )
+                        else:
+                            df[col] = df[old_col]
+                        df.drop(columns=[old_col], inplace=True)
             else:
-                # Fallback: preserve output columns by position (less reliable)
-                output_cols = [col for col in df_output.columns if col not in df.columns]
-                for col in output_cols:
-                    if col in df_output.columns and len(df_output) == len(df):
-                        df[col] = df_output[col].values
+                # Fallback by position if lengths match (less reliable)
+                if len(df_output) == len(df):
+                    for col in df_output.columns:
+                        if col not in df.columns:
+                            df[col] = df_output[col].values
+
         except Exception as e:
             print(f"[WARN] Failed to load existing output file '{out_path}': {e}. Starting fresh.", file=sys.stderr)
             df = load_table(args.input)
@@ -117,5 +153,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
