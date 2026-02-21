@@ -290,7 +290,8 @@ def _selective_accuracy_auc(
 
     x = np.asarray(coverages)
     y = np.asarray(accuracies)
-    auc = float(np.trapz(y, x=x))
+    _trapz = getattr(np, "trapezoid", None) or np.trapz  # NumPy 2.x compat
+    auc = float(_trapz(y, x=x))
     return auc
 
 

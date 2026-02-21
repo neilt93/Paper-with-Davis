@@ -347,7 +347,7 @@ class LocalHFAdapter(BaseAdapter):
             else:
                 raise
 
-        # Special-case Qwen2.5-VL, Molmo2, PaliGemma2, InternVL2, LLaVA, SmolVLM, and Llama Vision to avoid the AutoModelForCausalLM config error
+        # Special-case Qwen2.5-VL, Molmo2, PaliGemma2, InternVL2, LLaVA, SmolVLM, Gemma 3, and Llama Vision to avoid the AutoModelForCausalLM config error
         is_qwen_vision = "qwen2.5-vl" in model_id.lower() or "qwen2_5_vl" in model_id.lower()
         is_paligemma = "paligemma" in model_id.lower()
         is_llama_vision = "llama" in model_id.lower() and "vision" in model_id.lower()
@@ -355,13 +355,14 @@ class LocalHFAdapter(BaseAdapter):
         is_llava = "llava" in model_id.lower()
         is_smolvlm = "smolvlm" in model_id.lower()
         is_phi_vision = "phi" in model_id.lower() and "vision" in model_id.lower()
+        is_gemma3 = "gemma-3" in model_id.lower() or "gemma3" in model_id.lower()
 
         # Store model type for conditional behavior in answer()
         self._is_llama_vision = is_llama_vision
 
-        # Check if we should use 4-bit quantization for Llama (to reduce memory)
+        # Check if we should use 4-bit quantization for large models (to reduce memory)
         use_4bit_quantization = False
-        if is_llama_vision:
+        if is_llama_vision or is_gemma3:
             try:
                 from transformers import BitsAndBytesConfig  # type: ignore
                 import bitsandbytes  # type: ignore
@@ -442,18 +443,60 @@ class LocalHFAdapter(BaseAdapter):
                 trust_remote_code=True,
             )
         elif is_internvl:
-            # InternVL2 needs exact loading pattern from HuggingFace docs
-            # Use bfloat16 if supported, otherwise fall back to float16
+            # InternVL models: -hf variants use standard HF classes (AutoModelForImageTextToText),
+            # original variants use AutoModel with trust_remote_code
             if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
                 internvl_dtype = torch.bfloat16
             else:
                 internvl_dtype = dtype
-            self.model = self.AutoModel.from_pretrained(
+            is_hf_variant = model_id.lower().endswith("-hf")
+            if is_hf_variant and self.AutoModelForImageTextToText is not None:
+                ModelCls = self.AutoModelForImageTextToText
+            else:
+                ModelCls = self.AutoModel
+            self.model = ModelCls.from_pretrained(
                 model_id,
                 dtype=internvl_dtype,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True,
-                device_map="auto",  # Use device_map instead of hard-coded .cuda()
+                device_map="auto",
+            )
+        elif is_gemma3 and use_4bit_quantization:
+            # Load Gemma 3 with 4-bit quantization (27B needs ~13.5GB in 4-bit vs ~54GB in FP16)
+            from transformers import BitsAndBytesConfig  # type: ignore
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4"
+            )
+            if self.AutoModelForImageTextToText is not None:
+                ModelCls = self.AutoModelForImageTextToText
+            else:
+                ModelCls = self.AutoModelForCausalLM
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                quantization_config=quantization_config,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
+            )
+        elif is_gemma3:
+            # Gemma 3 without quantization (smaller variants or larger GPUs)
+            if self.AutoModelForImageTextToText is not None:
+                ModelCls = self.AutoModelForImageTextToText
+            else:
+                ModelCls = self.AutoModelForCausalLM
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                gemma_dtype = torch.bfloat16
+            else:
+                gemma_dtype = dtype
+            self.model = ModelCls.from_pretrained(
+                model_id,
+                dtype=gemma_dtype,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                trust_remote_code=True,
             )
         elif is_llama_vision and use_4bit_quantization:
             # Load Llama Vision with 4-bit quantization to reduce memory
@@ -723,7 +766,8 @@ class QwenLocalAdapter(BaseAdapter):
             trust_remote_code=True,
         )
 
-        is_qwen_vision = "qwen2.5-vl" in model_id.lower() or "qwen2_5_vl" in model_id.lower()
+        lower_id = model_id.lower()
+        is_qwen_vision = any(x in lower_id for x in ["qwen2.5-vl", "qwen2_5_vl", "qwen3-vl", "qwen3_vl"])
         if is_qwen_vision and self.AutoModelForImageTextToText is not None:  # type: ignore[truthy-function]
             ModelCls = self.AutoModelForImageTextToText
         else:
@@ -931,6 +975,10 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in {"claude", "anthropic", "claude-sonnet", "claude-3-5", "claude-3-7"}:
         return ClaudeAdapter(model="claude-sonnet-4-5-20250929")
 
+    # Qwen3-VL (newer generation, SOTA at 8B scale)
+    if name in {"qwen3-vl-8b", "qwen3-vl"}:
+        return QwenLocalAdapter("Qwen/Qwen3-VL-8B-Instruct")
+
     # Qwen gets a custom adapter so we can post-process its outputs.
     if name == "qwen-vl":
         return QwenLocalAdapter("Qwen/Qwen2.5-VL-3B-Instruct")
@@ -951,6 +999,9 @@ def get_adapter(model_name: str) -> BaseAdapter:
         "molmo": "allenai/Molmo2-4B",
         "gemma": "google/paligemma2-3b-mix-448",
         "llama-vision": "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        # Gemma 3: multimodal 27B (needs 4-bit quantization on 24GB GPU)
+        "gemma3-27b": "google/gemma-3-27b-it",
+        "gemma-3-27b": "google/gemma-3-27b-it",
         # Mid-tier open source (RTX 3090 compatible)
         # InternVL2-8B: use original repo (requires patch_internvl.py after download)
         "internvl2-8b": "OpenGVLab/InternVL2-8B",
