@@ -24,7 +24,7 @@ THIS_DIR = Path(__file__).resolve().parent
 if str(THIS_DIR) not in sys.path:
     sys.path.insert(0, str(THIS_DIR))
 
-from metrics import compute_all_metrics, composite_score_with_effective_weights, aurc_answered_only_diagnostics  # type: ignore
+from metrics import compute_all_metrics, composite_score_with_effective_weights, selrank_answered_only_diagnostics  # type: ignore
 
 
 VALID_LABELS = {
@@ -514,7 +514,7 @@ def main() -> None:
     if dfacc_den > 0:
         print(f"  DFAcc denominator (families)              : {dfacc_den} (num={dfacc_num})")
     print(f"  Abstention quality (AURC-normalised)       : {metrics['abstention_quality']:.4f}")
-    aurc_diag = aurc_answered_only_diagnostics(
+    aurc_diag = selrank_answered_only_diagnostics(
         metrics_df["gold_label"].values,
         metrics_df["pred_label"].values,
         metrics_df["confidence"].values,

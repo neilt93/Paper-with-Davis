@@ -200,7 +200,9 @@ class GPTAdapter(BaseAdapter):
                 ],
             }
         ]
-        resp = self.client.chat.completions.create(model=self.model, messages=msg, max_tokens=1024)
+        # GPT-5.x uses max_completion_tokens instead of max_tokens
+        token_kwarg = {"max_completion_tokens": 1024} if self.model.startswith("gpt-5") else {"max_tokens": 1024}
+        resp = self.client.chat.completions.create(model=self.model, messages=msg, **token_kwarg)
         text = resp.choices[0].message.content
         return ModelResponse(raw_text=text)
 
@@ -911,7 +913,7 @@ def get_adapter(model_name: str) -> BaseAdapter:
 
     # === FLAGSHIP MODELS ===
     if name in {"gpt5", "gpt-5", "gpt-5.2"}:
-        return GPTAdapter(model="gpt-4o")
+        return GPTAdapter(model="gpt-5.2")
 
     if name in {"gemini3", "gemini-3", "gemini-3-pro"}:
         return GeminiAdapter(model="gemini-3-pro-preview")
@@ -919,15 +921,15 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in {"opus", "claude-opus", "opus-4.5"}:
         return ClaudeAdapter(model="claude-opus-4-5-20251101")
 
-    # === LEGACY MODELS ===
+    # === LEGACY ALIASES (all point to current flagships) ===
     if name in {"gpt", "gpt4", "openai"}:
         return GPTAdapter(model="gpt-4o")
 
     if name in {"gemini", "gemini-1.5"}:
-        return GeminiAdapter(model="gemini-pro-latest")
+        return GeminiAdapter(model="gemini-2.5-pro")
 
     if name in {"claude", "anthropic", "claude-sonnet", "claude-3-5", "claude-3-7"}:
-        return ClaudeAdapter(model="claude-3-7-sonnet-20250219")
+        return ClaudeAdapter(model="claude-sonnet-4-5-20250929")
 
     # Qwen gets a custom adapter so we can post-process its outputs.
     if name == "qwen-vl":
@@ -1152,18 +1154,47 @@ def run_on_dataframe(df: pd.DataFrame, model_name: str, only_missing: bool = Fal
             )
             skipped_flip += 1
 
-        def _run(image_path: Optional[str], prompt: str, which: str) -> str:
+        def _run(image_path: Optional[str], prompt: str, which: str, retries: int = 2, timeout_sec: int = 90) -> str:
             if image_path is None:
                 return ""
-            try:
-                resp = adapter.answer(image_path, prompt)
-                return resp.raw_text
-            except Exception as e:
-                print(
-                    f"[ERROR] id={row_id} which={which} reason=model_error msg={e}",
-                    file=sys.stderr,
-                )
-                return f"ERROR: {e}"
+            import signal
+
+            class _Timeout(Exception):
+                pass
+
+            def _alarm_handler(signum, frame):
+                raise _Timeout()
+
+            for attempt in range(retries + 1):
+                old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+                signal.alarm(timeout_sec)
+                try:
+                    resp = adapter.answer(image_path, prompt)
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+                    return resp.raw_text
+                except _Timeout:
+                    signal.signal(signal.SIGALRM, old_handler)
+                    print(
+                        f"[TIMEOUT] id={row_id} which={which} attempt={attempt+1}/{retries+1} after {timeout_sec}s",
+                        file=sys.stderr,
+                    )
+                    continue
+                except Exception as e:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+                    if attempt < retries:
+                        print(
+                            f"[RETRY] id={row_id} which={which} attempt={attempt+1}/{retries+1} error={e}",
+                            file=sys.stderr,
+                        )
+                        continue
+                    print(
+                        f"[ERROR] id={row_id} which={which} reason=model_error msg={e}",
+                        file=sys.stderr,
+                    )
+                    return f"ERROR: {e}"
+            return f"ERROR: timeout after {retries+1} attempts"
 
         # 2×2 runs
         out_i0q0 = _run(base_path, prompt_q0, "I0q0")
