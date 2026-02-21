@@ -915,10 +915,10 @@ class QwenLocalAdapter(BaseAdapter):
         inputs = {k: v.to(model_device) if isinstance(v, self.torch.Tensor) else v for k, v in inputs.items()}
         
         with self.torch.no_grad():
-            # 64 tokens is plenty for a single minified JSON object.
-            # Add error handling for CUDA device-side asserts
+            # 256 tokens to accommodate Qwen3-VL's <think>…</think> reasoning
+            # before the JSON answer (64 was too short, causing truncated outputs).
             try:
-                ids = self.model.generate(**inputs, max_new_tokens=64)
+                ids = self.model.generate(**inputs, max_new_tokens=256)
             except RuntimeError as e:
                 error_str = str(e)
                 if "CUDA error" in error_str or "device-side assert" in error_str:
@@ -999,9 +999,11 @@ def get_adapter(model_name: str) -> BaseAdapter:
         "molmo": "allenai/Molmo2-4B",
         "gemma": "google/paligemma2-3b-mix-448",
         "llama-vision": "meta-llama/Llama-3.2-11B-Vision-Instruct",
-        # Gemma 3: multimodal 27B (needs 4-bit quantization on 24GB GPU)
+        # Gemma 3: multimodal (4-bit quantization on 24GB GPU)
         "gemma3-27b": "google/gemma-3-27b-it",
         "gemma-3-27b": "google/gemma-3-27b-it",
+        "gemma3-12b": "google/gemma-3-12b-it",
+        "gemma-3-12b": "google/gemma-3-12b-it",
         # Mid-tier open source (RTX 3090 compatible)
         # InternVL2-8B: use original repo (requires patch_internvl.py after download)
         "internvl2-8b": "OpenGVLab/InternVL2-8B",
