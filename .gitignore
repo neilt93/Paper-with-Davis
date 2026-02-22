@@ -56,3 +56,6 @@ Sheets/**/*.err.log
 Sheets/**/*.out.log
 Sheets/**/*.err.log.gz
 Sheets/**/*.out.log.gz
+
+# Large binary archives
+Images.zip

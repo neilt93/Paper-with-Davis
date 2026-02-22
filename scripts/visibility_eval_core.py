@@ -962,6 +962,9 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in {"gemini3", "gemini-3", "gemini-3-pro"}:
         return GeminiAdapter(model="gemini-3-pro-preview")
 
+    if name in {"gemini3.1", "gemini-3.1", "gemini-3.1-pro"}:
+        return GeminiAdapter(model="gemini-3.1-pro-preview")
+
     if name in {"opus", "claude-opus", "opus-4.5"}:
         return ClaudeAdapter(model="claude-opus-4-5-20251101")
 
