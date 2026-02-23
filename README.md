@@ -1,6 +1,19 @@
-# VLM Visibility Evaluation
+# VB: Visibility Benchmark for Vision-Language Models
 
-> **Note:** This repository accompanies our paper (draft): [Paper_with_Davis.pdf](./Paper_with_Davis.pdf)
+This repository contains the dataset, evaluation code, and paper source for **VB** (Visibility Benchmark), a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer.
+
+## Paper
+
+The paper is located in [`paper/main.tex`](./paper/main.tex) and can be built with `pdflatex`/`bibtex`. It evaluates **10 vision-language models** (4 flagship closed-source, 3 prior-generation closed-source, 3 open-source 8--12B) across 100 families using a 2x2 XOR design (300 headline evaluation cells per model). Key findings:
+
+- **Gemini 3.1 Pro** achieves the best composite score (0.727), followed by Gemini 3 Pro (0.679) and GPT-5 (0.656)
+- **Gemma 3 12B** is the best open-source model (0.505), surpassing two prior-generation closed-source systems
+- Text-flip robustness exceeds image-flip robustness for 7/10 models
+- Confidence calibration varies substantially across models
+
+Models are scored on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc).
+
+## Overview
 
 This project evaluates Vision Language Models (VLMs) on their ability to correctly determine whether specific visual information is perceivable in images.
 
