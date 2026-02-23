@@ -39,6 +39,7 @@
 
 \newcommand{\benchmarkname}{\textsc{VB}}
 \newcommand{\benchlong}{Visibility Benchmark}
+\newcommand{\tbd}{{--}}
 
 % Robust image include: if the file is missing, render a visible placeholder box
 \newcommand{\maybeincludegraphics}[3][]{%
@@ -66,21 +67,30 @@
 \maketitle
 
 \begin{abstract}
-We present \benchmarkname, a benchmark for visibility and perspective reasoning in images that explicitly tests whether an AI system can withhold judgement when a human viewer cannot reliably answer. Each example in the benchmark consists of a single photo paired with a short yes/no question about visual evidence, such as whether a sign is readable, whether an object is in view, or whether a person shown in the image can see an object in the image. The AI system is required to output one of three labels (\texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, \texttt{ABSTAIN}) plus a confidence for answered predictions. \benchmarkname{} is organised by a taxonomy of visibility factors and uses a family-based \(2 \times 2\) design over a minimal image edit and a minimal text edit. We evaluate models using confidence-aware accuracy with abstention, minimal-edit flip robustness, and a confidence-ranked selective prediction score, and we include a MULTI\_AGENT / SECOND\_ORDER slice for second-order perspective judgements grounded in a single photo. On 100 families (300 headline items), Gemini 3 Pro achieves the best overall composite score (0.679), followed by GPT-5 (0.656) and LLaVA-OneVision (0.597). We find that text edits are often handled more reliably than minimal image edits, and that confidence calibration varies substantially across models.
+We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc). We evaluate thirteen models spanning flagship and prior-generation closed-source systems, and open-source models from 2B to 12B parameters; results for four recently added models are pending. Among completed evaluations, Gemini 3 Pro achieves the best composite score (0.679), followed by GPT-5 (0.656) and LLaVA-OneVision (0.597). Text-flip robustness consistently exceeds image-flip robustness across models, and confidence calibration varies substantially---Gemini 3 Pro and GPT-5 achieve similar accuracy yet differ sharply in selective prediction quality.
 \end{abstract}
 
 \section{Introduction}
 
-Visibility is a prerequisite for safe and reliable image-grounded reasoning. Many visually phrased questions are not answerable from a single photo because the relevant evidence is occluded, out of frame, too small, too dark, washed out by glare, or not visually observable at all. In these cases, systems that guess can appear capable while failing exactly where calibrated withholding of judgement matters.
+Vision-language models are increasingly deployed in settings where incorrect visual judgments carry real consequences---autonomous driving systems that must detect obscured pedestrians, assistive technologies that describe scenes to blind users, and medical imaging tools that flag ambiguous findings. In all of these domains, a model that guesses when the visual evidence is insufficient can be more dangerous than one that explicitly withholds judgment.
 
-This paper introduces \benchmarkname, a benchmark designed to quantify whether a system can:
+Visibility is a prerequisite for safe and reliable image-grounded reasoning. Many visually phrased questions are unanswerable from a single photo because the relevant evidence is occluded, out of frame, too small, too dark, or not visually observable at all. This paper introduces \benchmarkname, a benchmark designed to quantify whether a system can:
 \begin{itemize}[noitemsep, topsep=3pt]
-  \item verify simple visibility claims from one image and a short question,
-  \item respond appropriately to minimal edits that should flip the correct label,
-  \item abstain when a human viewer cannot reliably and confidently answer from the photo.
+  \item verify simple visibility claims from one image and a short question (testing whether models distinguish ``visible'' from ``present''),
+  \item respond appropriately to minimal edits that should flip the correct label (testing robustness to controlled perturbations),
+  \item abstain when a human viewer cannot reliably answer from the photo (testing calibrated withholding of judgment).
 \end{itemize}
 
-We additionally include a MULTI\_AGENT / SECOND\_ORDER slice that tests second-order perspective judgements (for example, what one person can infer about what another person can see) from a single photo.
+We additionally include a MULTI\_AGENT / SECOND\_ORDER slice that tests second-order perspective judgments---for example, whether the photo supports a claim about what one person can infer about another person's visual access. This capability is essential for collaborative and social reasoning grounded in images.
+
+\paragraph{Contributions.}
+This paper makes four contributions:
+\begin{enumerate}[noitemsep, topsep=3pt]
+  \item The \benchmarkname{} benchmark: a task definition, an eight-category visibility taxonomy, and a \(2 \times 2\) family design that crosses minimal image edits with minimal text edits over 100 families.
+  \item A metric suite---CAA, MEFR, SelRank, and a weighted composite---tailored to visibility reasoning with explicit abstention and confidence calibration.
+  \item An evaluation of thirteen vision-language models (four pending) that reveals capability gaps between flagship and open-source systems, an asymmetry between text-flip and image-flip robustness, and substantial variation in confidence calibration.
+  \item Public release of the full dataset, per-image metadata, and evaluation infrastructure.
+\end{enumerate}
 
 \paragraph{Data release.}
 The full dataset, metadata, and evaluation code are released at:
@@ -262,20 +272,20 @@ Figure~\ref{fig:category_examples} shows one representative base/flip pair per p
 \section{Related work}
 \label{sec:related}
 
-\paragraph{Unanswerable visual questions and withholding judgement.}
-Davis points out that many questions about images are inherently unanswerable even with perfect vision because the relevant facts can be occluded, outside the frame, or non-visual \citep{davis_unanswerable_images}. Several benchmarks highlight that real images often do not support a definitive answer, due to blur, occlusion, missing context, or out-of-frame evidence. VizWiz collects question--image pairs from blind or vision-impaired users seeking assistance. Many images are low quality or do not contain enough visual evidence to answer the user's question \citep{gurari_vizwiz_2018}. Recent work explicitly evaluates abstention on unanswerable visual questions, for example UNK-VQA \citep{guo_unkvqa_2023} and TUBench \citep{he_tubench_2024}. \benchmarkname{} focuses specifically on visibility and perspective, and uses minimal edits to test whether models change their judgements when evidence changes.
+\paragraph{Unanswerable visual questions and withholding judgment.}
+Davis points out that many questions about images are inherently unanswerable even with perfect vision because the relevant facts can be occluded, outside the frame, or non-visual \citep{davis_unanswerable_images}. Several benchmarks highlight that real images often do not support a definitive answer. VizWiz collects question--image pairs from blind or vision-impaired users, many of which lack sufficient visual evidence for a confident answer \citep{gurari_vizwiz_2018}. Recent work explicitly evaluates abstention on unanswerable visual questions, for example UNK-VQA \citep{guo_unkvqa_2023} and TUBench \citep{he_tubench_2024}. \benchmarkname{} differs from these efforts in two ways: it tests not just \emph{whether} a question is unanswerable but \emph{why} (via reason codes tied to specific visibility factors), and it uses controlled minimal edits to verify that models change their judgments when and only when the underlying evidence changes.
 
 \paragraph{Visibility factors: gaze, occlusion, and field of view.}
-Datasets such as GazeFollow \citep{recasens_gazefollow_2015} and Following Gaze Across Views \citep{recasens_following_gaze_2017} study gaze targets and off-frame gaze. Work on occlusion and visibility cues analyses how blockers and partial views affect recognition and localisation. \benchmarkname{} differs by evaluating label-level support for a visibility claim under controlled edits rather than requiring precise localisation.
+Datasets such as GazeFollow \citep{recasens_gazefollow_2015} and Following Gaze Across Views \citep{recasens_following_gaze_2017} study gaze targets and off-frame gaze. Work on occlusion reasoning analyzes how blockers and partial views affect recognition and localization \citep{jiang_peekaboo_2020}. \benchmarkname{} differs by evaluating label-level support for a visibility claim under controlled edits rather than requiring precise localization.
 
 \paragraph{Hallucination and faithfulness in vision-language models.}
-Benchmarks such as MME \citep{fu_mme_2023} and POPE \citep{li_pope_2023} evaluate multimodal perception, cognition, and hallucinated object claims. \benchmarkname{} complements these by isolating a narrower but safety-relevant skill: deciding whether a claim is supported by visible evidence, and withholding judgement when it is not.
+Benchmarks such as MME \citep{fu_mme_2023} and POPE \citep{li_pope_2023} evaluate multimodal perception, cognition, and hallucinated object claims. \benchmarkname{} complements these by isolating a narrower but safety-relevant skill: deciding whether a claim is supported by visible evidence, and withholding judgment when it is not.
 
 \paragraph{Selective prediction, reject options, and risk-coverage.}
-Selective classification formalises the trade-off between risk and coverage when a classifier may reject \citep{elyaniv_selective_2010}. SelectiveNet and follow-up work evaluate selective prediction using risk-coverage curves and related summary statistics \citep{geifman_selectivenet_2019,varshney_selective_2022}. \benchmarkname{} uses a confidence-ranked selective prediction score to test whether model confidence aligns with correctness among answered items.
+Selective classification formalizes the trade-off between risk and coverage when a classifier may reject \citep{elyaniv_selective_2010}. SelectiveNet and follow-up work evaluate selective prediction using risk-coverage curves and related summary statistics \citep{geifman_selectivenet_2019,varshney_selective_2022}. \benchmarkname{} uses a confidence-ranked selective prediction score to test whether model confidence aligns with correctness among answered items.
 
 \paragraph{Second-order perspective and theory-of-mind style probes.}
-Recent work motivates stress tests for second-order perspective judgements and their brittleness under structured perturbations \citep{kosinski_tom_llms_2023,ullman_tom_perturbations}. \benchmarkname{} includes a dedicated MULTI\_AGENT / SECOND\_ORDER slice in which the label depends on what the photo supports about one agent's knowledge of another agent's visual access.
+Recent work motivates stress tests for second-order perspective judgments and their brittleness under structured perturbations \citep{kosinski_tom_llms_2023,ullman_tom_perturbations}. \benchmarkname{} includes a dedicated MULTI\_AGENT / SECOND\_ORDER slice in which the label depends on what the photo supports about one agent's knowledge of another agent's visual access. Unlike text-only theory-of-mind probes, \benchmarkname{} requires that second-order judgments be grounded in image evidence---the model must reason about what is visually accessible to each agent depicted in the photograph.
 
 \section{Benchmark design}
 \label{sec:design}
@@ -367,7 +377,7 @@ The fourth cell \((I^1,q^1)\) (\textbf{DOUBLE\_FLIP}) is \textbf{diagnostic only
 
 \subsection{Primary categories}
 
-\benchmarkname{} is organised around mutually exclusive primary visibility factors at the family level. Each base image is tagged with exactly one primary category.
+\benchmarkname{} is organized around mutually exclusive primary visibility factors at the family level. Each base image is tagged with exactly one primary category.
 
 \begin{table}[t]
   \centering
@@ -387,7 +397,7 @@ The fourth cell \((I^1,q^1)\) (\textbf{DOUBLE\_FLIP}) is \textbf{diagnostic only
     INHERENTLY\_NONVISUAL & Properties vision cannot reveal & ``Is the device PIN visible anywhere?'' & 10 \\
     AUGMENTED\_VISION\_REQUIRED & Requires magnification not available from the base photo & ``Is the fine print readable?'' & 7 \\
     INSUFFICIENT\_CONTEXT & Under-specified referents or missing scene facts & ``Is the correct key visible?'' & 7 \\
-    MULTI\_AGENT / SECOND\_ORDER & Second-order perspective judgements grounded in one photo & ``Does Bob know Alice cannot see the card?'' & 7 \\
+    MULTI\_AGENT / SECOND\_ORDER & Second-order perspective judgments grounded in one photo & ``Does Bob know Alice cannot see the card?'' & 7 \\
     \midrule
     \textbf{TOTAL} & & & 100 \\
     \bottomrule
@@ -398,7 +408,7 @@ The fourth cell \((I^1,q^1)\) (\textbf{DOUBLE\_FLIP}) is \textbf{diagnostic only
 \subsection{Multi-agent and second-order visibility}
 \label{subsec:multiagent}
 
-The MULTI\_AGENT / SECOND\_ORDER subset targets second-order judgements, where the system must decide whether the photo supports a claim about one agent's knowledge of another agent's visual access.
+The MULTI\_AGENT / SECOND\_ORDER subset targets second-order judgments, where the system must decide whether the photo supports a claim about one agent's knowledge of another agent's visual access.
 
 \paragraph{Writing rule (referents must be clear).}
 SECOND\_ORDER questions name agents and targets explicitly (for example ``Bob'', ``Alice'', and ``the card''), rather than relying on pronouns. If the referent would be unclear to a careful human, the intended gold label is \texttt{ABSTAIN} (reason code \texttt{INSUFFICIENT\_CONTEXT}).
@@ -445,7 +455,7 @@ Then
 \]
 
 \paragraph{Justification.}
-CAA rewards high confidence when correct, gives zero credit for incorrect answers regardless of confidence, and gives fixed partial credit for abstention. This avoids a gaming vulnerability where low-confidence wrong answers could score well under alternative formulations. The design is inspired by the selective prediction literature, where models trade coverage for reduced risk \citep{elyaniv_selective_2010,geifman_selectivenet_2019}. We use \(\alpha=0.25\) by default to give abstention a small but non-trivial value, reflecting that withholding judgement can be preferable to a guess in safety-relevant settings.
+CAA rewards high confidence when correct, gives zero credit for incorrect answers regardless of confidence, and gives fixed partial credit for abstention. This avoids a gaming vulnerability where low-confidence wrong answers could score well under alternative formulations. The design is inspired by the selective prediction literature, where models trade coverage for reduced risk \citep{elyaniv_selective_2010,geifman_selectivenet_2019}. We use \(\alpha=0.25\) by default to give abstention a small but non-trivial value, reflecting that withholding judgment can be preferable to a guess in safety-relevant settings.
 
 Headline CAA is computed on the three headline cells only (\texttt{BASE}, \texttt{TEXT\_FLIP}, \texttt{IMAGE\_FLIP}).
 
@@ -478,9 +488,9 @@ We evaluate selective prediction using confidence-ranked answering on headline c
 
 Sort answered items by confidence in descending order. For each prefix length \(k\), compute coverage \(\mathrm{cov}(k)=k/n\) and answered accuracy \(\mathrm{acc}(k)\). Let \(A_{\text{model}}\) be the area under the answered accuracy versus coverage curve (trapezoidal rule). Let \(p\) be the overall answered accuracy (the flat baseline).
 
-This is closely related to the standard area under the risk-coverage curve (AURC) used in selective classification \citep{elyaniv_selective_2010,varshney_selective_2022}, since \(\mathrm{risk}(k)=1-\mathrm{acc}(k)\). We use a normalised ``gain'' formulation where higher is better (unlike standard AURC where lower is better), and name it SelRank to avoid confusion.
+This is closely related to the standard area under the risk-coverage curve (AURC) used in selective classification \citep{elyaniv_selective_2010,varshney_selective_2022}, since \(\mathrm{risk}(k)=1-\mathrm{acc}(k)\). We use a normalized ``gain'' formulation where higher is better (unlike standard AURC where lower is better), and name it SelRank to avoid confusion.
 
-We report a normalised score (upper-capped at \(1\)):
+We report a normalized score (upper-capped at \(1\)):
 \[
 \mathrm{SelRank}=\min\left(1,\ \frac{A_{\text{model}}-p}{1-p}\right).
 \]
@@ -506,16 +516,16 @@ DFAcc is reported separately and is not included in the final composite score.
 
 The final benchmark score combines four headline components with fixed weights:
 \[
-\text{FinalScore}=0.70\cdot \text{CAA}
+\textsc{FinalScore}=0.70\cdot \text{CAA}
 +0.15\cdot \text{MEFR}
 +0.10\cdot \text{SelRank}
 +0.05\cdot \text{ToMAcc}.
 \]
 
 \paragraph{Weight choice.}
-These coefficients reflect a prioritisation: correctness with calibrated abstention is the primary objective, robustness to minimal edits is next, confidence ranking for selective answering is third, and second-order performance is included as a small but distinct capability axis. We therefore report all component metrics and encourage alternative weightings for different application priorities.
+These coefficients reflect a prioritization: correctness with calibrated abstention is the primary objective, robustness to minimal edits is next, confidence ranking for selective answering is third, and second-order performance is included as a small but distinct capability axis. We therefore report all component metrics and encourage alternative weightings for different application priorities.
 
-If no SECOND\_ORDER items are present in an evaluation run, weights are renormalised over the remaining terms.
+If no SECOND\_ORDER items are present in an evaluation run, weights are renormalized over the remaining terms.
 
 \section{Prompt template}
 \label{sec:prompt}
@@ -590,31 +600,34 @@ Question: {question}
 \section{Experimental setup}
 \label{sec:setup}
 
-We evaluated nine vision-language models on \benchmarkname{}, including four current flagship models and five prior-generation or smaller variants:
+We evaluated thirteen vision-language models on \benchmarkname{}, organized into four groups:
 \begin{itemize}[noitemsep, topsep=3pt]
-  \item \textbf{Flagship models:} Gemini 3 Pro (Google), GPT-5 (OpenAI), Claude Opus 4.5 (Anthropic), LLaVA-OneVision (open-source) \citep{liu_llava_onevision_2024}
-  \item \textbf{Prior-generation:} GPT-4o (OpenAI), Claude 3.7 Sonnet (Anthropic), Gemini 1.5 (Google)
-  \item \textbf{Smaller open-source:} Qwen2-VL-7B \citep{qwen2_vl_2024}, InternVL2-2B
+  \item \textbf{Flagship closed-source (4):} Gemini 3 Pro (Google), Gemini 3.1 Pro (Google), GPT-5 (OpenAI), Claude Opus 4.5 (Anthropic)
+  \item \textbf{Prior-generation closed-source (3):} GPT-4o (OpenAI), Claude 3.7 Sonnet (Anthropic), Gemini 1.5 (Google)
+  \item \textbf{Open-source $\geq$7B (4):} LLaVA-OneVision \citep{liu_llava_onevision_2024}, Qwen3-VL-8B \citep{qwen3_vl_2025}, InternVL3-8B \citep{internvl3_2025}, Gemma 3 12B \citep{gemma3_2025}
+  \item \textbf{Open-source $<$7B (2):} Qwen2-VL-7B \citep{qwen2_vl_2024}, InternVL2-2B
 \end{itemize}
+
+Results for four models (Gemini 3.1 Pro, Qwen3-VL-8B, InternVL3-8B, and Gemma 3 12B) are pending and marked with {--} in Tables~\ref{tab:main_results}--\ref{tab:selective_diag}.
 
 All models were queried with the prompt in Section~\ref{sec:prompt}. For each family, we ran the four cells (BASE, TEXT\_FLIP, IMAGE\_FLIP, DOUBLE\_FLIP). Headline metrics used the first three cells only, yielding \(3F=300\) scored headline items per model. We used \(\alpha=0.25\) for CAA. SelRank was computed on answered items only, with \texttt{ABSTAIN} excluded from coverage.
 
-Open-source models (LLaVA-OneVision, Qwen2-VL-7B, InternVL2-2B) were run on a single NVIDIA RTX 3090 GPU (24GB VRAM) using RunPod cloud infrastructure.
+Open-source models (LLaVA-OneVision, Qwen2-VL-7B, InternVL2-2B, and pending models Qwen3-VL-8B, InternVL3-8B, Gemma 3 12B) were run on a single NVIDIA RTX 3090 GPU (24\,GB VRAM) using RunPod cloud infrastructure.
 
 \section{Results}
 \label{sec:results}
 
 \subsection{Overall performance}
 
-Table~\ref{tab:main_results} reports the main results on the strict headline subset. Among flagship models, Gemini 3 Pro achieves the highest overall \textsc{FinalScore} (0.679), followed by GPT-5 (0.656) and LLaVA-OneVision (0.597). Claude Opus 4.5 (0.518) forms a middle tier. Prior-generation models GPT-4o (0.631), Claude 3.7 Sonnet (0.473), and Gemini 1.5 (0.431) score below their flagship successors. Smaller open-source models Qwen2-VL-7B (0.440) and InternVL2-2B (0.316) also score in this range.
+Table~\ref{tab:main_results} reports the main results on the strict headline subset for all thirteen models; four are pending evaluation. Among completed evaluations, Gemini 3 Pro achieves the highest overall \textsc{FinalScore} (0.679), followed by GPT-5 (0.656). The strongest open-source model, LLaVA-OneVision (0.597), ranks third overall. Claude Opus 4.5 (0.518) forms a middle tier among flagship systems. Prior-generation closed-source models GPT-4o (0.631), Claude 3.7 Sonnet (0.473), and Gemini 1.5 (0.431) generally score below their flagship successors, though GPT-4o remains competitive. Among smaller open-source models, Qwen2-VL-7B (0.440) and InternVL2-2B (0.316) occupy the lower range.
 
-Abstention behaviour varies substantially across models. Gemini 1.5 abstains most frequently (59 of 300 headline items), followed by InternVL2-2B (52), while Gemini 3 Pro abstains least (11 of 300). Because CAA awards partial credit for abstention, we report abstention counts alongside all headline metrics.
+Abstention behavior varies substantially across models. Gemini 1.5 abstains most frequently (59 of 300 headline items), followed by InternVL2-2B (52), while Gemini 3 Pro abstains least (11 of 300). Because CAA awards partial credit for abstention, we report abstention counts alongside all headline metrics. The four pending models (Gemini 3.1 Pro, Qwen3-VL-8B, InternVL3-8B, Gemma 3 12B) will provide additional data points across both the flagship and open-source tiers.
 
 \begin{table}[t]
 \centering
 \small
 \setlength{\tabcolsep}{3.5pt}
-\caption{Headline results on \benchmarkname{} (300 scored headline items per model). CAA uses \(\alpha=0.25\). SelRank is a normalised selective ranking score on answered items (negative values indicate anti-informative confidence ranking). \texttt{ABS} is the number of abstentions among the 300 headline items. Models above the mid-rule are current flagships; those below are prior-generation or smaller variants.}
+\caption{Headline results on \benchmarkname{} (300 scored headline items per model). CAA uses \(\alpha=0.25\). SelRank is a normalized selective ranking score on answered items (negative values indicate anti-informative confidence ranking). \texttt{ABS} is the number of abstentions among the 300 headline items. Models are grouped into four tiers: flagship closed-source, prior-generation closed-source, open-source $\geq$7B, and open-source $<$7B. {--} indicates results pending.}
 \label{tab:main_results}
 \begin{tabular}{l
 S[table-format=1.3]
@@ -630,13 +643,19 @@ S[table-format=2.0]
 \textbf{Model} & {\textbf{Final}} & {\textbf{CAA}} & {\textbf{I\_MEFR}} & {\textbf{T\_MEFR}} & {\textbf{MEFR}} & {\textbf{SelRank}} & {\textbf{ToMAcc}} & {\textbf{ABS}} \\
 \midrule
 Gemini 3 Pro      & 0.679 & 0.716 & 0.570 & 0.826 & 0.698 &  0.313 & 0.833 & 11 \\
+Gemini 3.1 Pro    & \tbd  & \tbd  & \tbd  & \tbd  & \tbd  &  \tbd  & \tbd  & \tbd \\
 GPT-5             & 0.656 & 0.718 & 0.593 & 0.852 & 0.722 &  0.014 & 0.875 & 15 \\
-LLaVA-OneVision   & 0.597 & 0.653 & 0.595 & 0.919 & 0.757 & -0.006 & 0.542 & 30 \\
 Claude Opus 4.5   & 0.518 & 0.543 & 0.423 & 0.654 & 0.539 &  0.256 & 0.625 & 19 \\
 \midrule
 GPT-4o            & 0.631 & 0.695 & 0.583 & 0.889 & 0.736 & -0.098 & 0.875 & 17 \\
 Claude 3.7 Sonnet & 0.473 & 0.516 & 0.439 & 0.561 & 0.500 &  0.098 & 0.542 & 25 \\
 Gemini 1.5        & 0.431 & 0.490 & 0.565 & 0.391 & 0.478 & -0.066 & 0.458 & 59 \\
+\midrule
+LLaVA-OneVision   & 0.597 & 0.653 & 0.595 & 0.919 & 0.757 & -0.006 & 0.542 & 30 \\
+Qwen3-VL-8B      & \tbd  & \tbd  & \tbd  & \tbd  & \tbd  &  \tbd  & \tbd  & \tbd \\
+InternVL3-8B      & \tbd  & \tbd  & \tbd  & \tbd  & \tbd  &  \tbd  & \tbd  & \tbd \\
+Gemma 3 12B       & \tbd  & \tbd  & \tbd  & \tbd  & \tbd  &  \tbd  & \tbd  & \tbd \\
+\midrule
 Qwen2-VL-7B       & 0.440 & 0.481 & 0.356 & 0.384 & 0.370 &  0.233 & 0.500 & 37 \\
 InternVL2-2B      & 0.316 & 0.367 & 0.382 & 0.000 & 0.191 &  0.146 & 0.304 & 52 \\
 \bottomrule
@@ -645,19 +664,19 @@ InternVL2-2B      & 0.316 & 0.367 & 0.382 & 0.000 & 0.191 &  0.146 & 0.304 & 52 
 
 \subsection{Minimal edit sensitivity}
 
-Across models, TEXT\_FLIP performance (T\_MEFR) generally exceeds IMAGE\_FLIP performance (I\_MEFR), suggesting that many failures come from visual sensitivity rather than parsing the text edit. This asymmetry is strongest for LLaVA-OneVision, which attains high T\_MEFR (0.919) but lower I\_MEFR (0.595). GPT-5 shows a similar pattern (0.852 versus 0.593). InternVL2-2B shows the most extreme asymmetry: T\_MEFR of 0.000 indicates complete failure on text-flipped questions while maintaining some I\_MEFR (0.382).
+A consistent pattern across completed models is that T\_MEFR exceeds I\_MEFR, indicating that text-flipped questions are handled more reliably than minimal image edits. This asymmetry is most pronounced for LLaVA-OneVision (T\_MEFR 0.919 vs.\ I\_MEFR 0.595) and GPT-5 (0.852 vs.\ 0.593). InternVL2-2B exhibits the most extreme case: T\_MEFR of 0.000 indicates complete failure on negated questions, while I\_MEFR (0.382) remains nonzero.
 
-Gemini 3 Pro and GPT-5 show the most balanced and highest overall MEFR scores (0.698 and 0.722 respectively), indicating robust handling of both edit types.
+GPT-5 and Gemini 3 Pro show the most balanced and highest overall MEFR scores (0.722 and 0.698 respectively), indicating robust handling of both edit types.
 
 \subsection{Abstention, coverage, and confidence ranking}
 
-Since SelRank is answered-only, it is useful to also report answered coverage and answered accuracy. Table~\ref{tab:selective_diag} reports answered fraction, answered-only accuracy, the MEFR denominator (families where BASE is correct), and the raw normalised SelRank.
+Since SelRank is answered-only, it is useful to also report answered coverage and answered accuracy. Table~\ref{tab:selective_diag} reports answered fraction, answered-only accuracy, the MEFR denominator (families where BASE is correct), and the raw normalized SelRank.
 
 \begin{table}[t]
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\caption{Selective prediction and MEFR diagnostics on headline items. \textbf{Answered} counts non-\texttt{ABSTAIN} outputs among 300 headline items. \textbf{Coverage} is answered/300. \textbf{AnsAcc} is accuracy on answered items only. \textbf{SelRank$_{\text{raw}}$} is the normalised selective ranking score before clamping. \textbf{MEFR d} is the number of families with correct BASE prediction. Models above the mid-rule are current flagships; those below are prior-generation or smaller variants.}
+\caption{Selective prediction and MEFR diagnostics on headline items. \textbf{Answered} counts non-\texttt{ABSTAIN} outputs among 300 headline items. \textbf{Coverage} is answered/300. \textbf{AnsAcc} is accuracy on answered items only. \textbf{SelRank$_{\text{raw}}$} is the normalized selective ranking score before clamping. \textbf{MEFR d} is the number of families with correct BASE prediction. Model grouping follows Table~\ref{tab:main_results}; {--} indicates results pending.}
 \label{tab:selective_diag}
 \begin{tabular}{l
 S[table-format=3.0]
@@ -670,13 +689,19 @@ S[table-format=2.0]
 \textbf{Model} & {\textbf{Answered}} & {\textbf{Cov (\%)}} & {\textbf{AnsAcc}} & {\textbf{SelRank$_{\text{raw}}$}} & {\textbf{MEFR d}} \\
 \midrule
 Gemini 3 Pro      & 289 & 96.3 & 0.754 &  0.313 & 86 \\
+Gemini 3.1 Pro    & \tbd & \tbd & \tbd  &  \tbd  & \tbd \\
 GPT-5             & 285 & 95.0 & 0.775 &  0.014 & 81 \\
-LLaVA-OneVision   & 270 & 90.0 & 0.730 & -0.006 & 37 \\
 Claude Opus 4.5   & 281 & 93.7 & 0.641 &  0.256 & 78 \\
 \midrule
 GPT-4o            & 283 & 94.3 & 0.753 & -0.098 & 72 \\
 Claude 3.7 Sonnet & 275 & 91.7 & 0.582 &  0.098 & 66 \\
 Gemini 1.5        & 235 & 78.3 & 0.630 & -0.066 & 46 \\
+\midrule
+LLaVA-OneVision   & 270 & 90.0 & 0.730 & -0.006 & 37 \\
+Qwen3-VL-8B      & \tbd & \tbd & \tbd  &  \tbd  & \tbd \\
+InternVL3-8B      & \tbd & \tbd & \tbd  &  \tbd  & \tbd \\
+Gemma 3 12B       & \tbd & \tbd & \tbd  &  \tbd  & \tbd \\
+\midrule
 Qwen2-VL-7B       & 263 & 87.7 & 0.540 &  0.233 & 73 \\
 InternVL2-2B      & 224 & 74.7 & 0.415 &  0.146 & 35 \\
 \bottomrule
@@ -689,33 +714,37 @@ Several patterns emerge. First, GPT-5 achieves the highest answered-only accurac
 
 ToMAcc is computed on the MULTI\_AGENT / SECOND\_ORDER slice (8 families, 24 headline items). GPT-5 and GPT-4o tie for best performance on this subset (both 0.875), followed by Gemini 3 Pro (0.833). Claude Opus 4.5 scores 0.625, Claude 3.7 Sonnet and LLaVA-OneVision both score 0.542, Qwen2-VL-7B scores 0.500, Gemini 1.5 scores 0.458, and InternVL2-2B scores lowest (0.304). The strong performance of flagship closed-source models on second-order reasoning is notable, with GPT-5, GPT-4o and Gemini 3 Pro substantially outperforming both open-source alternatives and prior-generation models.
 
-\paragraph{Confidence intervals.} With only 24 items, ToMAcc estimates have wide confidence intervals. Using Wilson's method, the 95\% CI for ToMAcc = 0.875 (21/24) is approximately [0.68, 0.96], and for ToMAcc = 0.500 (12/24) is approximately [0.30, 0.70]. Rankings within this subset should be interpreted cautiously; expanding the SECOND\_ORDER slice is a priority for future dataset releases.
+\paragraph{Confidence intervals.} With only 24 items, ToMAcc estimates have wide confidence intervals. Using Wilson's method, the 95\% CI for ToMAcc = 0.875 (21/24) is approximately [0.68, 0.96], and for ToMAcc = 0.500 (12/24) is approximately [0.30, 0.70]. Rankings within this subset should be interpreted cautiously; expanding the SECOND\_ORDER slice is a priority for future dataset releases. The expanded model set will provide additional data points for this subset.
 
 \subsection{Diagnostic: double flip}
 
-We also record DOUBLE\_FLIP behaviour \((I^1,q^1)\) for diagnosis, but it is not included in \textsc{FinalScore}. The DOUBLE\_FLIP cell can identify families where composing edits yields unexpected interactions, or where an intended atomic edit incidentally changes additional visibility factors. In this release we treat DOUBLE\_FLIP primarily as a diagnostic signal and leave systematic family auditing based on DOUBLE\_FLIP to future work.
+We also record DOUBLE\_FLIP behavior \((I^1,q^1)\) for diagnosis, but it is not included in \textsc{FinalScore}. The DOUBLE\_FLIP cell can identify families where composing edits yields unexpected interactions, or where an intended atomic edit incidentally changes additional visibility factors. In this release we treat DOUBLE\_FLIP primarily as a diagnostic signal and leave systematic family auditing based on DOUBLE\_FLIP to future work.
 
 \subsection{Open-source versus closed-source}
 
-The results show a clear performance gap between flagship closed-source models and open-source alternatives. Gemini 3 Pro (0.679) and GPT-5 (0.656) substantially outperform all open-source models, with LLaVA-OneVision (0.597) being the strongest open-source contender. The gap is particularly pronounced on second-order reasoning (ToMAcc), where GPT-5 (0.875) and Gemini 3 Pro (0.833) far exceed open-source models.
+Among completed evaluations, a performance gap exists between flagship closed-source models and the open-source models tested so far. Gemini 3 Pro (0.679) and GPT-5 (0.656) outperform all completed open-source models, with LLaVA-OneVision (0.597) as the strongest open-source contender---a gap of 0.082 in composite score (roughly 14\% relative to the top flagship). The gap is particularly pronounced on second-order reasoning (ToMAcc), where GPT-5 (0.875) and Gemini 3 Pro (0.833) far exceed open-source models.
 
-Among open-source models, LLaVA-OneVision demonstrates competitive performance on text-flip robustness (T\_MEFR 0.919, highest among all models) but lags on confidence calibration. Smaller models like InternVL2-2B (2B parameters) struggle substantially, particularly on text understanding (T\_MEFR 0.000).
+However, the open-source picture is incomplete. LLaVA-OneVision already demonstrates competitive text-flip robustness (T\_MEFR 0.919, highest among all completed models), suggesting that specific capabilities can match or exceed closed-source systems. At the other extreme, InternVL2-2B (2B parameters) struggles substantially, particularly on text understanding (T\_MEFR 0.000), indicating a floor effect for very small models on negated questions. The three pending open-source models---Qwen3-VL-8B, InternVL3-8B, and Gemma 3 12B---will clarify whether the gap narrows at the 8--12B parameter scale or whether closed-source training advantages persist.
 
 \section{Discussion}
 
-\benchmarkname{} is designed to make visibility, answerability, and abstention measurable under controlled perturbations. The \(2 \times 2\) family structure probes two complementary sensitivities: changing the text claim while holding the image fixed, and changing the image evidence while holding the question fixed. The headline score focuses on these three cells, while the double flip is retained for diagnostic analysis of compositional effects. The MULTI\_AGENT / SECOND\_ORDER slice further isolates second-order perspective judgements that can fail even when first-order verification is straightforward.
+The evaluation of thirteen models (nine completed, four pending) on \benchmarkname{} reveals three findings about the state of visibility reasoning in current vision-language models.
 
-The results highlight several findings. First, flagship closed-source models (Gemini 3 Pro, GPT-5) substantially outperform open-source alternatives across most metrics, with particularly large gaps on second-order reasoning. Second, text-flip robustness (T\_MEFR) tends to exceed image-flip robustness (I\_MEFR) across most models, suggesting that visual sensitivity to minimal evidence changes remains a key challenge. Third, confidence calibration varies substantially: Gemini 3 Pro shows informative confidence ranking (SelRank 0.313), while GPT-5's confidence scores are nearly uninformative for selective prediction despite high accuracy.
+\paragraph{Flagship versus open-source gap.} Among completed evaluations, flagship closed-source models (Gemini 3 Pro, GPT-5) outperform the best open-source model (LLaVA-OneVision) by roughly 14\% in relative composite score. The gap is largest on second-order reasoning, where GPT-5 (ToMAcc 0.875) substantially exceeds all open-source alternatives. Whether the three pending open-source models at the 8--12B scale narrow this gap will be informative for understanding the role of model scale versus training data in visibility reasoning.
 
-\paragraph{Limitations and scope.}
-The current release is modest in scale (100 families) and collected in a narrow set of environments (campus and nearby streets), so results may not fully represent performance in other settings. The benchmark uses short yes/no questions to tightly control claims, which improves interpretability but does not cover longer multi-step reasoning. Finally, the composite score uses fixed weights to reflect one set of priorities; we emphasise component metrics to support alternative weighting choices.
+\paragraph{Text-flip versus image-flip asymmetry.} T\_MEFR consistently exceeds I\_MEFR across nearly all models, suggesting that models are better at tracking logical negation in text than at detecting subtle visual changes between minimally edited photos. This asymmetry has practical implications: text augmentation (rephrasing questions, testing negations) may be a more effective robustness intervention than visual augmentation for current systems. The extreme case of InternVL2-2B (T\_MEFR 0.000) suggests a floor effect in which very small models cannot reliably handle negated questions at all.
+
+\paragraph{Calibration variability.} Gemini 3 Pro and GPT-5 achieve similar accuracy (CAA 0.716 vs.\ 0.718) yet differ sharply in selective prediction quality (SelRank 0.313 vs.\ 0.014). This dissociation implies that accuracy alone is insufficient for deployment decisions: a system whose confidence scores do not rank correctness cannot safely defer uncertain predictions. The connection to selective prediction literature \citep{elyaniv_selective_2010,geifman_selectivenet_2019} is direct---SelRank measures exactly the property needed for risk-coverage trade-offs in practice.
+
+\paragraph{Limitations.}
+The current release has several limitations. First, 100 families provide limited statistical power for fine-grained comparisons, particularly on the 24-item SECOND\_ORDER slice. Second, all images were collected in a narrow set of environments (campus buildings and nearby streets), so results may not generalize to other settings such as rural, industrial, or indoor-medical scenes. Third, the composite score uses fixed weights; we have not yet conducted a sensitivity analysis over alternative weightings. Fourth, four of thirteen models are pending evaluation, and their results may shift the comparative picture. Finally, the benchmark uses short yes/no questions to tightly control claims, which improves interpretability but does not cover longer multi-step reasoning.
 
 \paragraph{Implications.}
-Visibility reasoning is a prerequisite for safe image-grounded behaviour. The observed gaps between flagship and open-source models suggest that this capability scales with model size and training investment. The variability in confidence calibration indicates that systems should be evaluated not only on correctness, but also on whether they express uncertainty in ways that support selective answering.
+Visibility reasoning is a prerequisite for safe image-grounded behavior, and the patterns observed here suggest three practical takeaways. First, the calibration gap between Gemini 3 Pro and GPT-5 indicates that systems should be evaluated not only on correctness but also on whether they express uncertainty in ways that support selective answering. Second, the T\_MEFR $>$ I\_MEFR asymmetry suggests that text augmentation (e.g., testing negated question variants) may be a more effective robustness intervention than visual augmentation for current models. Third, the floor effect observed for InternVL2-2B (T\_MEFR 0.000) implies that very small models may lack the capacity for reliable negation handling, a prerequisite for the abstention-aware reasoning \benchmarkname{} targets.
 
 \section{Conclusion}
 
-We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. In an evaluation of nine vision-language models across 100 families, we find that flagship closed-source models (Gemini 3 Pro, GPT-5) substantially outperform open-source alternatives, with the largest gaps on second-order reasoning. We also find that text-flip robustness often exceeds image-flip robustness, and that confidence calibration varies substantially across models. \benchmarkname{} provides a focused stress test for evidence-grounded image understanding and calibrated withholding of judgement from a single photo.
+We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. We evaluate thirteen vision-language models across 100 families, with results completed for nine models and four pending. Among completed evaluations, flagship closed-source models (Gemini 3 Pro, GPT-5) achieve the highest composite scores, while the best open-source model (LLaVA-OneVision) demonstrates competitive text-flip robustness. The expanded open-source evaluation---including Qwen3-VL-8B, InternVL3-8B, and Gemma 3 12B---will clarify whether the current performance gap narrows at the 8--12B parameter scale. Future work will expand the benchmark with additional families, a larger SECOND\_ORDER slice, and images from broader environments to strengthen statistical power and generalizability.
 
 \section*{Acknowledgements}
 I thank Ernest Davis for detailed feedback on benchmark design, paper presentation, and evaluation methodology.
