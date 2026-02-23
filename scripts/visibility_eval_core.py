@@ -14,6 +14,7 @@ reimplementing the logic.
 """
 
 import os
+import re
 import sys
 from dataclasses import dataclass
 from typing import Optional, List
@@ -358,6 +359,7 @@ class LocalHFAdapter(BaseAdapter):
         is_gemma3 = "gemma-3" in model_id.lower() or "gemma3" in model_id.lower()
 
         # Store model type for conditional behavior in answer()
+        self._model_id = model_id
         self._is_llama_vision = is_llama_vision
 
         # Check if we should use 4-bit quantization for large models (to reduce memory)
@@ -462,25 +464,37 @@ class LocalHFAdapter(BaseAdapter):
                 device_map="auto",
             )
         elif is_gemma3 and use_4bit_quantization:
-            # Load Gemma 3 with 4-bit quantization (27B needs ~13.5GB in 4-bit vs ~54GB in FP16)
-            from transformers import BitsAndBytesConfig  # type: ignore
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=dtype,
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_quant_type="nf4"
-            )
+            # Skip quantization for 12B (fits in 24GB bf16); use 4-bit only for 27B
+            is_27b = "27b" in model_id.lower()
             if self.AutoModelForImageTextToText is not None:
                 ModelCls = self.AutoModelForImageTextToText
             else:
                 ModelCls = self.AutoModelForCausalLM
-            self.model = ModelCls.from_pretrained(
-                model_id,
-                quantization_config=quantization_config,
-                device_map="auto",
-                low_cpu_mem_usage=True,
-                trust_remote_code=True,
-            )
+            if is_27b:
+                from transformers import BitsAndBytesConfig  # type: ignore
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=dtype,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+                self.model = ModelCls.from_pretrained(
+                    model_id,
+                    quantization_config=quantization_config,
+                    device_map="auto",
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True,
+                )
+            else:
+                # 12B fits in bf16 on 24GB GPU
+                gemma_dtype = torch.bfloat16 if (torch.cuda.is_available() and torch.cuda.is_bf16_supported()) else dtype
+                self.model = ModelCls.from_pretrained(
+                    model_id,
+                    dtype=gemma_dtype,
+                    device_map="auto",
+                    low_cpu_mem_usage=True,
+                    trust_remote_code=True,
+                )
         elif is_gemma3:
             # Gemma 3 without quantization (smaller variants or larger GPUs)
             if self.AutoModelForImageTextToText is not None:
@@ -616,10 +630,28 @@ class LocalHFAdapter(BaseAdapter):
         else:
             inputs_for_generate = inputs
 
+        # Use 256 tokens for models that may emit <think> reasoning before JSON
+        is_internvl = "internvl" in getattr(self, '_model_id', '').lower()
+        tok_limit = 256 if is_internvl else 128
+
         with self.torch.no_grad():
-            ids = self.model.generate(**inputs_for_generate, max_new_tokens=128)
+            ids = self.model.generate(**inputs_for_generate, max_new_tokens=tok_limit)
         text = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
-        return ModelResponse(raw_text=text.strip())
+
+        # Strip <think>…</think> reasoning blocks that some models emit
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+        # Try to isolate the last valid JSON object (like QwenLocalAdapter does)
+        s = text.strip()
+        try:
+            import json as _json
+            start = s.rindex("{")
+            end = s.rindex("}") + 1
+            candidate = s[start:end]
+            _json.loads(candidate)
+            return ModelResponse(raw_text=candidate)
+        except Exception:
+            return ModelResponse(raw_text=s)
 
 
 class ClaudeAdapter(BaseAdapter):
