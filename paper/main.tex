@@ -66,7 +66,7 @@
 \maketitle
 
 \begin{abstract}
-We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc). We evaluate ten models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. Gemini 3.1 Pro achieves the best composite score (0.727), followed by Gemini 3 Pro (0.679) and GPT-5 (0.656). The best open-source model, Gemma 3 12B (0.505), surpasses two prior-generation closed-source systems. Text-flip robustness exceeds image-flip robustness for seven of ten models, and confidence calibration varies substantially---Gemini 3 Pro and GPT-5 achieve similar accuracy yet differ sharply in selective prediction quality.
+We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc). We evaluate nine models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. GPT-4o and Gemini 3.1 Pro tie for the best composite score (0.728 and 0.727), followed by Gemini 2.5 Pro (0.678). The best open-source model, Gemma 3 12B (0.505), surpasses one prior-generation closed-source system. Text-flip robustness exceeds image-flip robustness for six of nine models, and confidence calibration varies substantially---GPT-4o and Gemini 2.5 Pro achieve similar accuracy yet differ sharply in selective prediction quality.
 \end{abstract}
 
 \section{Introduction}
@@ -87,7 +87,7 @@ This paper makes four contributions:
 \begin{enumerate}[noitemsep, topsep=3pt]
   \item The \benchmarkname{} benchmark: a task definition, an eight-category visibility taxonomy, and a \(2 \times 2\) family design that crosses minimal image edits with minimal text edits over 100 families.
   \item A metric suite---CAA, MEFR, SelRank, and a weighted composite---tailored to visibility reasoning with explicit abstention and confidence calibration.
-  \item An evaluation of ten vision-language models that reveals capability gaps between flagship and open-source systems, an asymmetry between text-flip and image-flip robustness, and substantial variation in confidence calibration.
+  \item An evaluation of nine vision-language models that reveals capability gaps between flagship and open-source systems, an asymmetry between text-flip and image-flip robustness, and substantial variation in confidence calibration.
   \item Public release of the full dataset, per-image metadata, and evaluation infrastructure.
 \end{enumerate}
 
@@ -391,9 +391,9 @@ The fourth cell \((I^1,q^1)\) (\textbf{DOUBLE\_FLIP}) is \textbf{diagnostic only
     \midrule
     GAZE\_DIRECTION & Head and eye orientation versus target & ``Is Pat looking at the mug?'' & 20 \\
     OCCLUSION & Opaque blockers along line of sight & ``Is the metal key blade visible?'' & 20 \\
-    OUT\_OF\_FRAME & Target outside current view or crop & ``Is the dog visible in the photo?'' & 16 \\
+    OUT\_OF\_FRAME & Target outside current view or crop & ``Is the dog visible in the photo?'' & 15 \\
     LIGHTING\_DISTANCE & Darkness, glare, or distance limits & ``Is the sign text readable?'' & 13 \\
-    INHERENTLY\_NONVISUAL & Properties vision cannot reveal & ``Is the device PIN visible anywhere?'' & 10 \\
+    INHERENTLY\_NONVISUAL & Properties vision cannot reveal & ``Is the device PIN visible anywhere?'' & 11 \\
     AUGMENTED\_VISION\_REQUIRED & Requires magnification not available from the base photo & ``Is the fine print readable?'' & 7 \\
     INSUFFICIENT\_CONTEXT & Under-specified referents or missing scene facts & ``Is the correct key visible?'' & 7 \\
     MULTI\_AGENT / SECOND\_ORDER & Second-order perspective judgments grounded in one photo & ``Does Bob know Alice cannot see the card?'' & 7 \\
@@ -599,10 +599,10 @@ Question: {question}
 \section{Experimental setup}
 \label{sec:setup}
 
-We evaluated ten vision-language models on \benchmarkname{}, organized into three groups:
+We evaluated nine vision-language models on \benchmarkname{}, organized into three groups:
 \begin{itemize}[noitemsep, topsep=3pt]
-  \item \textbf{Flagship closed-source (4):} Gemini 3.1 Pro (Google), Gemini 3 Pro (Google), GPT-5 (OpenAI), Claude Opus 4.5 (Anthropic)
-  \item \textbf{Prior-generation closed-source (3):} GPT-4o (OpenAI), Claude 3.7 Sonnet (Anthropic), Gemini 1.5 (Google)
+  \item \textbf{Flagship closed-source (3):} Gemini 3.1 Pro (Google), GPT-5 (OpenAI), Claude Opus 4.5 (Anthropic)
+  \item \textbf{Prior-generation closed-source (3):} GPT-4o (OpenAI), Gemini 2.5 Pro (Google), Claude 3.7 Sonnet (Anthropic)
   \item \textbf{Open-source 8--12B (3):} Gemma 3 12B \citep{gemma3_2025}, InternVL3-8B \citep{internvl3_2025}, Qwen3-VL-8B \citep{qwen3_vl_2025}
 \end{itemize}
 
@@ -615,15 +615,15 @@ Open-source models (Gemma 3 12B, InternVL3-8B, Qwen3-VL-8B) were run on a single
 
 \subsection{Overall performance}
 
-Table~\ref{tab:main_results} reports the main results on the strict headline subset for all ten models. Gemini 3.1 Pro achieves the highest overall \textsc{FinalScore} (0.727), followed by Gemini 3 Pro (0.679) and GPT-5 (0.656). Claude Opus 4.5 (0.518) forms a middle tier among flagship systems. Prior-generation closed-source models GPT-4o (0.631), Claude 3.7 Sonnet (0.473), and Gemini 1.5 (0.431) generally score below their flagship successors, though GPT-4o remains competitive. The best open-source model, Gemma 3 12B (0.505), surpasses both Claude 3.7 Sonnet and Gemini 1.5, demonstrating that current open-source models at the 8--12B scale can exceed prior-generation closed-source systems on visibility reasoning. InternVL3-8B (0.445) and Qwen3-VL-8B (0.419) occupy the lower range.
+Table~\ref{tab:main_results} reports the main results on the strict headline subset for all nine models. GPT-4o and Gemini 3.1 Pro effectively tie for the highest overall \textsc{FinalScore} (0.728 and 0.727 respectively), followed by Gemini 2.5 Pro (0.678) and GPT-5 (0.625). Claude Opus 4.5 (0.570) forms a middle tier among flagship systems. Among prior-generation models, GPT-4o (0.728) substantially outperforms its tier peers Gemini 2.5 Pro (0.678) and Claude 3.7 Sonnet (0.476). The best open-source model, Gemma 3 12B (0.505), surpasses Claude 3.7 Sonnet, demonstrating that current open-source models at the 8--12B scale can exceed prior-generation closed-source systems on visibility reasoning. InternVL3-8B (0.445) and Qwen3-VL-8B (0.419) occupy the lower range.
 
-Abstention behavior varies substantially across models. Gemini 1.5 abstains most frequently (59 of 300 headline items), followed by Qwen3-VL-8B (50), while Gemini 3 Pro abstains least (11 of 300). Qwen3-VL-8B also produced 66 unparsable outputs across all cells (49 in headline cells), reducing its effective coverage. Because CAA awards partial credit for abstention, we report abstention counts alongside all headline metrics.
+Abstention behavior varies substantially across models. GPT-5 abstains most frequently (78 of 300 headline items), followed by Qwen3-VL-8B (50), while Gemini 3.1 Pro abstains least (14 of 300). Qwen3-VL-8B also produced 66 unparsable outputs across all cells (49 in headline cells), reducing its effective coverage. Because CAA awards partial credit for abstention, we report abstention counts alongside all headline metrics.
 
 \begin{table}[t]
 \centering
 \small
 \setlength{\tabcolsep}{3.5pt}
-\caption{Headline results on \benchmarkname{} (300 scored headline items per model). CAA uses \(\alpha=0.25\). SelRank is a normalized selective ranking score on answered items (negative values indicate anti-informative confidence ranking). \texttt{ABS} is the number of abstentions among the 300 headline items. Models are grouped into three tiers: flagship closed-source, prior-generation closed-source, and open-source 8--12B.}
+\caption{Headline results on \benchmarkname{} (300 scored headline items per model). CAA uses \(\alpha=0.25\). SelRank is a normalized selective ranking score on answered items (negative values indicate anti-informative confidence ranking). \texttt{ABS} is the number of abstentions among the 300 headline items. Models are grouped into three tiers (3/3/3): flagship closed-source, prior-generation closed-source, and open-source 8--12B.}
 \label{tab:main_results}
 \begin{tabular}{l
 S[table-format=1.3]
@@ -639,13 +639,12 @@ S[table-format=2.0]
 \textbf{Model} & {\textbf{Final}} & {\textbf{CAA}} & {\textbf{I\_MEFR}} & {\textbf{T\_MEFR}} & {\textbf{MEFR}} & {\textbf{SelRank}} & {\textbf{ToMAcc}} & {\textbf{ABS}} \\
 \midrule
 Gemini 3.1 Pro    & 0.727 & 0.760 & 0.659 & 0.871 & 0.765 &  0.394 & 0.810 & 14 \\
-Gemini 3 Pro      & 0.679 & 0.716 & 0.570 & 0.826 & 0.698 &  0.313 & 0.833 & 11 \\
-GPT-5             & 0.656 & 0.718 & 0.593 & 0.852 & 0.722 &  0.014 & 0.875 & 15 \\
-Claude Opus 4.5   & 0.518 & 0.543 & 0.423 & 0.654 & 0.539 &  0.256 & 0.625 & 19 \\
+GPT-5             & 0.625 & 0.622 & 0.793 & 0.845 & 0.819 &  0.237 & 0.857 & 78 \\
+Claude Opus 4.5   & 0.570 & 0.580 & 0.570 & 0.671 & 0.620 &  0.374 & 0.667 & 18 \\
 \midrule
-GPT-4o            & 0.631 & 0.695 & 0.583 & 0.889 & 0.736 & -0.098 & 0.875 & 17 \\
-Claude 3.7 Sonnet & 0.473 & 0.516 & 0.439 & 0.561 & 0.500 &  0.098 & 0.542 & 25 \\
-Gemini 1.5        & 0.431 & 0.490 & 0.565 & 0.391 & 0.478 & -0.066 & 0.458 & 59 \\
+GPT-4o            & 0.728 & 0.769 & 0.800 & 0.893 & 0.847 &  0.144 & 0.952 & 16 \\
+Gemini 2.5 Pro    & 0.678 & 0.747 & 0.743 & 0.892 & 0.818 & -0.106 & 0.857 & 18 \\
+Claude 3.7 Sonnet & 0.476 & 0.508 & 0.507 & 0.493 & 0.500 &  0.192 & 0.524 & 30 \\
 \midrule
 Gemma 3 12B       & 0.505 & 0.543 & 0.424 & 0.644 & 0.534 &  0.087 & 0.714 & 25 \\
 InternVL3-8B      & 0.445 & 0.498 & 0.610 & 0.373 & 0.492 &  0.018 & 0.429 & 24 \\
@@ -656,9 +655,9 @@ Qwen3-VL-8B      & 0.419 & 0.509 & 0.307 & 0.180 & 0.243 &  0.033 & 0.450 & 50 \
 
 \subsection{Minimal edit sensitivity}
 
-T\_MEFR exceeds I\_MEFR for seven of ten models, indicating that text-flipped questions are generally handled more reliably than minimal image edits. This asymmetry is most pronounced for GPT-4o (T\_MEFR 0.889 vs.\ I\_MEFR 0.583) and GPT-5 (0.852 vs.\ 0.593). Three models reverse the pattern: InternVL3-8B (I\_MEFR 0.610 vs.\ T\_MEFR 0.373), Qwen3-VL-8B (0.307 vs.\ 0.180), and Gemini 1.5 (0.565 vs.\ 0.391), all showing higher image-flip robustness than text-flip robustness.
+T\_MEFR exceeds I\_MEFR for six of nine models, indicating that text-flipped questions are generally handled more reliably than minimal image edits. This asymmetry is most pronounced for GPT-4o (T\_MEFR 0.893 vs.\ I\_MEFR 0.800) and Gemini 2.5 Pro (0.892 vs.\ 0.743). Three models reverse the pattern: InternVL3-8B (I\_MEFR 0.610 vs.\ T\_MEFR 0.373), Qwen3-VL-8B (0.307 vs.\ 0.180), and Claude 3.7 Sonnet (0.507 vs.\ 0.493), though the last reversal is marginal.
 
-Gemini 3.1 Pro achieves the highest overall MEFR (0.765), followed by GPT-5 (0.722) and Gemini 3 Pro (0.698), indicating robust handling of both edit types. Qwen3-VL-8B shows the lowest MEFR (0.243), partly due to its low T\_MEFR (0.180), suggesting difficulty with negated questions.
+GPT-4o achieves the highest overall MEFR (0.847), followed by GPT-5 (0.819) and Gemini 2.5 Pro (0.818), indicating robust handling of both edit types. Qwen3-VL-8B shows the lowest MEFR (0.243), partly due to its low T\_MEFR (0.180), suggesting difficulty with negated questions.
 
 \subsection{Abstention, coverage, and confidence ranking}
 
@@ -668,7 +667,7 @@ Since SelRank is answered-only, it is useful to also report answered coverage an
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\caption{Selective prediction and MEFR diagnostics on headline items. \textbf{Answered} counts non-\texttt{ABSTAIN} outputs among 300 headline items (for Qwen3-VL-8B, 49 headline items were unparsable and excluded). \textbf{Coverage} is answered/300. \textbf{AnsAcc} is accuracy on answered items only. \textbf{SelRank$_{\text{raw}}$} is the normalized selective ranking score before clamping. \textbf{MEFR d} is the number of families with correct BASE prediction. Model grouping follows Table~\ref{tab:main_results}.}
+\caption{Selective prediction and MEFR diagnostics on headline items. \textbf{Answered} counts non-\texttt{ABSTAIN} outputs among 300 headline items (for Qwen3-VL-8B, 49 headline items were unparsable and excluded). \textbf{Coverage} is answered/300. \textbf{AnsAcc} is accuracy on answered items only. \textbf{SelRank$_{\text{raw}}$} is the normalized selective ranking score before capping. \textbf{MEFR d} is the number of families with correct BASE prediction. Model grouping follows Table~\ref{tab:main_results}.}
 \label{tab:selective_diag}
 \begin{tabular}{l
 S[table-format=3.0]
@@ -681,13 +680,12 @@ S[table-format=2.0]
 \textbf{Model} & {\textbf{Answered}} & {\textbf{Cov (\%)}} & {\textbf{AnsAcc}} & {\textbf{SelRank$_{\text{raw}}$}} & {\textbf{MEFR d}} \\
 \midrule
 Gemini 3.1 Pro    & 286 & 95.3 & 0.804 &  0.394 & 85 \\
-Gemini 3 Pro      & 289 & 96.3 & 0.754 &  0.313 & 86 \\
-GPT-5             & 285 & 95.0 & 0.775 &  0.014 & 81 \\
-Claude Opus 4.5   & 281 & 93.7 & 0.641 &  0.256 & 78 \\
+GPT-5             & 222 & 74.0 & 0.851 &  0.237 & 58 \\
+Claude Opus 4.5   & 282 & 94.0 & 0.684 &  0.374 & 79 \\
 \midrule
-GPT-4o            & 283 & 94.3 & 0.753 & -0.098 & 72 \\
-Claude 3.7 Sonnet & 275 & 91.7 & 0.582 &  0.098 & 66 \\
-Gemini 1.5        & 235 & 78.3 & 0.630 & -0.066 & 46 \\
+GPT-4o            & 284 & 94.7 & 0.831 &  0.144 & 75 \\
+Gemini 2.5 Pro    & 282 & 94.0 & 0.794 & -0.106 & 74 \\
+Claude 3.7 Sonnet & 270 & 90.0 & 0.589 &  0.192 & 73 \\
 \midrule
 Gemma 3 12B       & 275 & 91.7 & 0.618 &  0.087 & 59 \\
 InternVL3-8B      & 273 & 91.0 & 0.553 &  0.018 & 59 \\
@@ -696,13 +694,13 @@ Qwen3-VL-8B      & 201 & 67.0 & 0.582 &  0.033 & 72 \\
 \end{tabular}
 \end{table}
 
-Several patterns emerge. First, Gemini 3.1 Pro achieves the highest answered-only accuracy (0.804) with high coverage (95.3\%) and the best confidence calibration (SelRank 0.394), meaning higher-confidence answers tend to be more accurate. Second, GPT-5 achieves comparable answered accuracy (0.775) but its SelRank is near zero (0.014), indicating that confidence scores do not meaningfully rank correctness. Among legacy models, GPT-4o achieves comparable answered accuracy to GPT-5 (0.753 vs 0.775) but with worse calibration (SelRank $-0.098$), suggesting that confidence ranking has improved in the newer model generation. Gemini 1.5 abstains most frequently among closed-source models (59 abstentions, 78.3\% coverage), achieving reasonable answered accuracy (0.630) but low overall scores due to limited coverage. Among open-source models, Qwen3-VL-8B shows the lowest effective coverage (67.0\%) due to 49 unparsable headline outputs, though its answered-only accuracy (0.582) exceeds that of InternVL3-8B (0.553).
+Several patterns emerge. First, GPT-5 achieves the highest answered-only accuracy (0.851) but with unusually low coverage (74.0\%, 78 abstentions), indicating a cautious strategy that substantially reduces its composite score. Second, GPT-4o achieves the second-highest answered accuracy (0.831) with high coverage (94.7\%) and moderate calibration (SelRank 0.144). Third, Gemini 3.1 Pro achieves the best confidence calibration (SelRank 0.394) alongside strong answered accuracy (0.804, 95.3\% coverage), meaning higher-confidence answers tend to be more accurate. By contrast, Gemini 2.5 Pro achieves similar answered accuracy (0.794) and coverage (94.0\%) but has anti-informative confidence ranking (SelRank $-0.106$), meaning its lower-confidence answers tend to be more correct. Among open-source models, Qwen3-VL-8B shows the lowest effective coverage (67.0\%) due to 49 unparsable headline outputs, though its answered-only accuracy (0.582) exceeds that of InternVL3-8B (0.553).
 
 \subsection{Multi-agent and second-order subset}
 
-ToMAcc is computed on the MULTI\_AGENT / SECOND\_ORDER slice (8 families, 24 headline items). GPT-5 and GPT-4o tie for best performance on this subset (both 0.875), followed by Gemini 3 Pro (0.833) and Gemini 3.1 Pro (0.810). Among open-source models, Gemma 3 12B scores 0.714, while Qwen3-VL-8B (0.450) and InternVL3-8B (0.429) perform near chance level. Claude Opus 4.5 scores 0.625, Claude 3.7 Sonnet 0.542, and Gemini 1.5 0.458. The strong performance of flagship closed-source models on second-order reasoning is notable, with GPT-5, GPT-4o, Gemini 3 Pro, and Gemini 3.1 Pro substantially outperforming open-source alternatives.
+ToMAcc is computed on the MULTI\_AGENT / SECOND\_ORDER slice (7 families, 21 headline items). GPT-4o achieves the best performance on this subset (0.952), followed by GPT-5 and Gemini 2.5 Pro (both 0.857) and Gemini 3.1 Pro (0.810). Among open-source models, Gemma 3 12B scores 0.714, while Claude 3.7 Sonnet (0.524), Qwen3-VL-8B (0.450), and InternVL3-8B (0.429) perform near chance level. Claude Opus 4.5 scores 0.667. The strong performance of GPT-4o on second-order reasoning is notable, with all three prior-generation and flagship Google and OpenAI models substantially outperforming open-source alternatives.
 
-\paragraph{Confidence intervals.} With only 24 items, ToMAcc estimates have wide confidence intervals. Using Wilson's method, the 95\% CI for ToMAcc = 0.875 (21/24) is approximately [0.68, 0.96], and for ToMAcc = 0.450 (9/20) is approximately [0.24, 0.68]. Rankings within this subset should be interpreted cautiously; expanding the SECOND\_ORDER slice is a priority for future dataset releases.
+\paragraph{Confidence intervals.} With only 21 items, ToMAcc estimates have wide confidence intervals. Using Wilson's method, the 95\% CI for ToMAcc = 0.952 (20/21) is approximately [0.77, 0.99], and for ToMAcc = 0.429 (9/21) is approximately [0.24, 0.64]. Rankings within this subset should be interpreted cautiously; expanding the SECOND\_ORDER slice is a priority for future dataset releases.
 
 \subsection{Diagnostic: double flip}
 
@@ -710,29 +708,29 @@ We also record DOUBLE\_FLIP behavior \((I^1,q^1)\) for diagnosis, but it is not 
 
 \subsection{Open-source versus closed-source}
 
-A substantial performance gap exists between flagship closed-source models and open-source models at the 8--12B scale. Gemini 3.1 Pro (0.727) outperforms the best open-source model, Gemma 3 12B (0.505), by 0.222 in composite score (roughly 30\% relative). The gap is particularly pronounced on second-order reasoning (ToMAcc), where GPT-5 (0.875) and Gemini 3.1 Pro (0.810) far exceed all open-source alternatives (Gemma 3 12B: 0.714, InternVL3-8B: 0.429, Qwen3-VL-8B: 0.450).
+A substantial performance gap exists between flagship closed-source models and open-source models at the 8--12B scale. GPT-4o (0.728) and Gemini 3.1 Pro (0.727) outperform the best open-source model, Gemma 3 12B (0.505), by over 0.22 in composite score (roughly 30\% relative). The gap is particularly pronounced on second-order reasoning (ToMAcc), where GPT-4o (0.952) and Gemini 3.1 Pro (0.810) far exceed all open-source alternatives (Gemma 3 12B: 0.714, InternVL3-8B: 0.429, Qwen3-VL-8B: 0.450).
 
-However, the open-source tier shows meaningful differentiation. Gemma 3 12B (0.505) surpasses two prior-generation closed-source systems---Claude 3.7 Sonnet (0.473) and Gemini 1.5 (0.431)---demonstrating that visibility reasoning is not exclusively a closed-source capability. At the other extreme, Qwen3-VL-8B shows the lowest MEFR (0.243) and produced 66 unparsable outputs across all cells, suggesting output-format compliance issues that limit effective evaluation. InternVL3-8B (0.445) falls between its open-source peers, with notably high image-flip robustness (I\_MEFR 0.610) but weak text-flip handling (T\_MEFR 0.373).
+However, the open-source tier shows meaningful differentiation. Gemma 3 12B (0.505) surpasses one prior-generation closed-source system---Claude 3.7 Sonnet (0.476)---demonstrating that visibility reasoning is not exclusively a closed-source capability. At the other extreme, Qwen3-VL-8B shows the lowest MEFR (0.243) and produced 66 unparsable outputs across all cells, suggesting output-format compliance issues that limit effective evaluation. InternVL3-8B (0.445) falls between its open-source peers, with notably high image-flip robustness (I\_MEFR 0.610) but weak text-flip handling (T\_MEFR 0.373).
 
 \section{Discussion}
 
-The evaluation of ten models on \benchmarkname{} reveals three findings about the state of visibility reasoning in current vision-language models.
+The evaluation of nine models on \benchmarkname{} reveals three findings about the state of visibility reasoning in current vision-language models.
 
-\paragraph{Flagship versus open-source gap.} Flagship closed-source models (Gemini 3.1 Pro, Gemini 3 Pro, GPT-5) outperform the best open-source model (Gemma 3 12B) by roughly 30\% in relative composite score (0.727 vs.\ 0.505). The gap is largest on second-order reasoning, where GPT-5 (ToMAcc 0.875) and Gemini 3.1 Pro (0.810) substantially exceed open-source alternatives. However, Gemma 3 12B surpasses two prior-generation closed-source systems, suggesting that the gap is narrowing at the 8--12B parameter scale.
+\paragraph{Flagship versus open-source gap.} The top closed-source models (GPT-4o, Gemini 3.1 Pro) outperform the best open-source model (Gemma 3 12B) by roughly 30\% in relative composite score (0.728 vs.\ 0.505). The gap is largest on second-order reasoning, where GPT-4o (ToMAcc 0.952) and Gemini 3.1 Pro (0.810) substantially exceed open-source alternatives. However, Gemma 3 12B surpasses one prior-generation closed-source system, suggesting that the gap is narrowing at the 8--12B parameter scale.
 
-\paragraph{Text-flip versus image-flip asymmetry.} T\_MEFR exceeds I\_MEFR for seven of ten models, suggesting that models are generally better at tracking logical negation in text than at detecting subtle visual changes between minimally edited photos. This asymmetry has practical implications: text augmentation (rephrasing questions, testing negations) may be a more effective robustness intervention than visual augmentation for current systems. Three models reverse the pattern---InternVL3-8B, Qwen3-VL-8B, and Gemini 1.5---all showing higher image-flip robustness. Qwen3-VL-8B shows the lowest T\_MEFR (0.180), suggesting a floor effect in which some models cannot reliably handle negated questions.
+\paragraph{Text-flip versus image-flip asymmetry.} T\_MEFR exceeds I\_MEFR for six of nine models, suggesting that models are generally better at tracking logical negation in text than at detecting subtle visual changes between minimally edited photos. This asymmetry has practical implications: text augmentation (rephrasing questions, testing negations) may be a more effective robustness intervention than visual augmentation for current systems. Three models reverse the pattern---InternVL3-8B, Qwen3-VL-8B, and Claude 3.7 Sonnet---though the last reversal is marginal (0.507 vs.\ 0.493). Qwen3-VL-8B shows the lowest T\_MEFR (0.180), suggesting a floor effect in which some models cannot reliably handle negated questions.
 
-\paragraph{Calibration variability.} Gemini 3 Pro and GPT-5 achieve similar accuracy (CAA 0.716 vs.\ 0.718) yet differ sharply in selective prediction quality (SelRank 0.313 vs.\ 0.014). Gemini 3.1 Pro achieves the best calibration overall (SelRank 0.394) alongside the highest accuracy (CAA 0.760). This dissociation implies that accuracy alone is insufficient for deployment decisions: a system whose confidence scores do not rank correctness cannot safely defer uncertain predictions. The connection to selective prediction literature \citep{elyaniv_selective_2010,geifman_selectivenet_2019} is direct---SelRank measures exactly the property needed for risk-coverage trade-offs in practice.
+\paragraph{Calibration variability.} GPT-4o and Gemini 2.5 Pro achieve similar accuracy (CAA 0.769 vs.\ 0.747) yet differ sharply in selective prediction quality (SelRank 0.144 vs.\ $-0.106$). Gemini 3.1 Pro achieves the best calibration overall (SelRank 0.394) alongside strong accuracy (CAA 0.760). This dissociation implies that accuracy alone is insufficient for deployment decisions: a system whose confidence scores do not rank correctness cannot safely defer uncertain predictions. The connection to selective prediction literature \citep{elyaniv_selective_2010,geifman_selectivenet_2019} is direct---SelRank measures exactly the property needed for risk-coverage trade-offs in practice.
 
 \paragraph{Limitations.}
-The current release has several limitations. First, 100 families provide limited statistical power for fine-grained comparisons, particularly on the 24-item SECOND\_ORDER slice. Second, all images were collected in a narrow set of environments (campus buildings and nearby streets), so results may not generalize to other settings such as rural, industrial, or indoor-medical scenes. Third, the composite score uses fixed weights; we have not yet conducted a sensitivity analysis over alternative weightings. Fourth, the benchmark uses short yes/no questions to tightly control claims, which improves interpretability but does not cover longer multi-step reasoning. Fifth, Qwen3-VL-8B produced 66 unparsable outputs, reducing its effective evaluation set and potentially underestimating its capabilities.
+The current release has several limitations. First, 100 families provide limited statistical power for fine-grained comparisons, particularly on the 21-item SECOND\_ORDER slice. Second, all images were collected in a narrow set of environments (campus buildings and nearby streets), so results may not generalize to other settings such as rural, industrial, or indoor-medical scenes. Third, the composite score uses fixed weights; we have not yet conducted a sensitivity analysis over alternative weightings. Fourth, the benchmark uses short yes/no questions to tightly control claims, which improves interpretability but does not cover longer multi-step reasoning. Fifth, Qwen3-VL-8B produced 66 unparsable outputs, reducing its effective evaluation set and potentially underestimating its capabilities.
 
 \paragraph{Implications.}
-Visibility reasoning is a prerequisite for safe image-grounded behavior, and the patterns observed here suggest three practical takeaways. First, the calibration gap between Gemini 3 Pro and GPT-5 indicates that systems should be evaluated not only on correctness but also on whether they express uncertainty in ways that support selective answering. Second, the T\_MEFR $>$ I\_MEFR asymmetry (present in seven of ten models) suggests that text augmentation (e.g., testing negated question variants) may be a more effective robustness intervention than visual augmentation for current models. Third, the low T\_MEFR observed for Qwen3-VL-8B (0.180) indicates that some open-source models at the 8B scale still lack reliable negation handling, a prerequisite for the abstention-aware reasoning \benchmarkname{} targets.
+Visibility reasoning is a prerequisite for safe image-grounded behavior, and the patterns observed here suggest three practical takeaways. First, the calibration gap between GPT-4o and Gemini 2.5 Pro indicates that systems should be evaluated not only on correctness but also on whether they express uncertainty in ways that support selective answering. Second, the T\_MEFR $>$ I\_MEFR asymmetry (present in six of nine models) suggests that text augmentation (e.g., testing negated question variants) may be a more effective robustness intervention than visual augmentation for current models. Third, the low T\_MEFR observed for Qwen3-VL-8B (0.180) indicates that some open-source models at the 8B scale still lack reliable negation handling, a prerequisite for the abstention-aware reasoning \benchmarkname{} targets.
 
 \section{Conclusion}
 
-We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. We evaluate ten vision-language models across 100 families. Flagship closed-source models (Gemini 3.1 Pro, Gemini 3 Pro, GPT-5) achieve the highest composite scores, while the best open-source model (Gemma 3 12B) surpasses prior-generation closed-source systems, demonstrating that visibility reasoning capabilities are beginning to transfer to the open-source tier at the 8--12B scale. Future work will expand the benchmark with additional families, a larger SECOND\_ORDER slice, and images from broader environments to strengthen statistical power and generalizability.
+We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. We evaluate nine vision-language models across 100 families. GPT-4o and Gemini 3.1 Pro achieve the highest composite scores, while the best open-source model (Gemma 3 12B) surpasses one prior-generation closed-source system, demonstrating that visibility reasoning capabilities are beginning to transfer to the open-source tier at the 8--12B scale. Future work will expand the benchmark with additional families, a larger SECOND\_ORDER slice, and images from broader environments to strengthen statistical power and generalizability.
 
 \section*{Acknowledgements}
 I thank Ernest Davis for detailed feedback on benchmark design, paper presentation, and evaluation methodology.

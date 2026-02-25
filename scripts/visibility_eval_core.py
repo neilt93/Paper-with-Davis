@@ -1004,7 +1004,7 @@ def get_adapter(model_name: str) -> BaseAdapter:
     if name in {"gpt", "gpt4", "openai"}:
         return GPTAdapter(model="gpt-4o")
 
-    if name in {"gemini", "gemini-1.5"}:
+    if name in {"gemini", "gemini-1.5", "gemini-2.5", "gemini-2.5-pro"}:
         return GeminiAdapter(model="gemini-2.5-pro")
 
     if name in {"claude", "anthropic", "claude-sonnet", "claude-3-5", "claude-3-7"}:
