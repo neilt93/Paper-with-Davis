@@ -66,7 +66,7 @@
 \maketitle
 
 \begin{abstract}
-We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. Unlike prior unanswerable-VQA benchmarks, \benchmarkname{} tests not only \emph{whether} a question is unanswerable but \emph{why} (via reason codes tied to specific visibility factors), and uses controlled minimal edits to verify that model judgments change when and only when the underlying evidence changes. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc); all headline numbers are computed on the strict XOR subset (three cells per family, 300 scored items per model). We evaluate nine models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. GPT-4o and Gemini 3.1 Pro tie for the best composite score (0.728 and 0.727), followed by Gemini 2.5 Pro (0.678). The best open-source model, Gemma 3 12B (0.505), surpasses one prior-generation closed-source system. Text-flip robustness exceeds image-flip robustness for six of nine models, and confidence calibration varies substantially---GPT-4o and Gemini 2.5 Pro achieve similar accuracy yet differ sharply in selective prediction quality.
+We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. Unlike prior unanswerable-VQA benchmarks, \benchmarkname{} tests not only \emph{whether} a question is unanswerable but \emph{why} (via reason codes tied to specific visibility factors), and uses controlled minimal edits to verify that model judgments change when and only when the underlying evidence changes. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc); all headline numbers are computed on the strict XOR subset (three cells per family, 300 scored items per model). We evaluate nine models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. GPT-4o and Gemini 3.1 Pro effectively tie for the best composite score (0.728 and 0.727), followed by Gemini 2.5 Pro (0.678). The best open-source model, Gemma 3 12B (0.505), surpasses one prior-generation closed-source system. Text-flip robustness exceeds image-flip robustness for six of nine models, and confidence calibration varies substantially---GPT-4o and Gemini 2.5 Pro achieve similar accuracy yet differ sharply in selective prediction quality.
 \end{abstract}
 
 \section{Introduction}
@@ -392,7 +392,7 @@ SECOND\_ORDER families follow the same \(2 \times 2\) structure. For the strict 
 All images were collected by the authors in and around the NYU campus. Indoor scenes were photographed in student dormitory spaces (bedrooms, kitchens, laundry rooms, corridors, stairwells, and common areas). Outdoor scenes were photographed in the surrounding city (pavements, street crossings, car parks, and neighbourhood parks). Images were captured at approximately human eye height using a smartphone camera. The release includes per-image metadata and editing provenance.
 
 \paragraph{Ethics and privacy.}
-Because images include dormitory interiors and campus environments, we took steps to limit privacy exposure. Faces of bystanders are either absent, turned away, or too small to identify at release resolution. No images contain legible personal identifiers (student IDs, mail labels, or screen contents showing private information). All photographs were taken by the authors with the knowledge of any participants who appear. The dataset is released under the MIT license for research use.
+Because images include dormitory interiors and campus environments, we took steps to limit privacy exposure. Faces of bystanders are either absent, turned away, or too small to identify at release resolution. No images contain legible personal identifiers (student IDs, mail labels, or screen contents showing private information). All photographs were taken by the authors with the knowledge of any participants who appear. Evaluation code is released under the MIT license; the dataset (images and metadata) is released under CC~BY~4.0.
 
 \section{Evaluation and scoring}
 \label{sec:evaluation}
@@ -518,71 +518,99 @@ We used a single, explicit instruction block (provided as the user message) to s
 The prompt is shown verbatim below, with \texttt{\{question\}} substituted per item.
 
 \begin{quote}
-\begin{Verbatim}[fontsize=\footnotesize,breaklines=true]
-You are given one photo and one question. Decide whether the question's claim is true using only pixels in this photo. Do not guess and do not use world knowledge.
+\begin{Verbatim}[fontsize=\footnotesize,breaklines=false,commandchars=none]
+You are given one photo and one question. Decide whether the
+question's claim is true using only pixels in this photo.
+Do not guess and do not use world knowledge.
 
 Observer
 
-The observer is the camera unless the question explicitly names a person in the image as the observer.
+The observer is the camera unless the question explicitly
+names a person in the image as the observer.
 
 How to interpret questions
 
-Treat questions like "Is X visible/readable/clear?" or "Is person A looking at X?" as a true/false claim you must judge from the image.
+Treat questions like "Is X visible/readable/clear?" or
+"Is person A looking at X?" as a true/false claim you must
+judge from the image.
 
-For open-ended content questions (eg "what's in the box?", "what time is it?"), convert them into: "Is that information visually determinable from this photo right now?"
+For open-ended content questions (eg "what's in the box?",
+"what time is it?"), convert them into: "Is that information
+visually determinable from this photo right now?"
 
 Referring expressions (who is "he/she/they/it")
 
 Do not require arrows, circles, or any on-image markings.
 
-If the question uses pronouns or vague references, you must be able to identify the referent unambiguously from the image plus the question text alone.
+If the question uses pronouns or vague references, you must
+be able to identify the referent unambiguously from the image
+plus the question text alone.
 
-Acceptable disambiguation: only one plausible referent exists, or the question uniquely specifies it via clear visual descriptors (eg "the man on the left", "the woman in the red jacket", "the cat on the sofa").
+Acceptable disambiguation: only one plausible referent exists,
+or the question uniquely specifies it via clear visual
+descriptors (eg "the man on the left", "the woman in the red
+jacket", "the cat on the sofa").
 
-If multiple referents are plausible and the text does not uniquely pick one, choose ABSTAIN with reason_code=INSUFFICIENT_CONTEXT.
+If multiple referents are plausible and the text does not
+uniquely pick one, choose ABSTAIN with
+reason_code=INSUFFICIENT_CONTEXT.
 
 Output format
-Return exactly one JSON object (no prose, no markdown, no trailing commas) with keys in this order:
+
+Return exactly one JSON object (no prose, no markdown,
+no trailing commas) with keys in this order:
+
 {
-  "label": "VISIBLY_TRUE | VISIBLY_FALSE | ABSTAIN",
-  "reason_code": "GAZE_DIRECTION | OCCLUSION | OUT_OF_FRAME
-                 | LIGHTING_DISTANCE | INHERENTLY_NONVISUAL
-                 | AUGMENTED_VISION_REQUIRED
-                 | INSUFFICIENT_CONTEXT
-                 | MULTI_AGENT_SECOND_ORDER | NONE",
-  "confidence": <number 0.0--1.0>
+  "label":       "VISIBLY_TRUE | VISIBLY_FALSE | ABSTAIN",
+  "reason_code": "GAZE_DIRECTION | OCCLUSION
+                | OUT_OF_FRAME | LIGHTING_DISTANCE
+                | INHERENTLY_NONVISUAL
+                | AUGMENTED_VISION_REQUIRED
+                | INSUFFICIENT_CONTEXT
+                | MULTI_AGENT_SECOND_ORDER | NONE",
+  "confidence":  <number 0.0 to 1.0>
 }
 
 Label meanings
 
-VISIBLY_TRUE: the claim in the question is clearly true from pixels.
-
-VISIBLY_FALSE: the claim in the question is clearly false from pixels.
-
-ABSTAIN: you cannot decide true vs false with reasonable confidence from this image.
+VISIBLY_TRUE:  the claim is clearly true from pixels.
+VISIBLY_FALSE: the claim is clearly false from pixels.
+ABSTAIN:       you cannot decide true vs false with
+               reasonable confidence from this image.
 
 Reason codes
 
 If label="VISIBLY_TRUE", set reason_code="NONE".
 
-If label="ABSTAIN", pick exactly one reason_code explaining what prevents a decision.
+If label="ABSTAIN", pick exactly one reason_code explaining
+what prevents a decision.
 
 If label="VISIBLY_FALSE":
 
-If the claim is false because the opposite is clearly true (eg the question asserts "not visible" but it is plainly visible), you may set reason_code="NONE".
+  If the claim is false because the opposite is clearly true
+  (eg the question asserts "not visible" but it is plainly
+  visible), you may set reason_code="NONE".
 
-Otherwise pick exactly one limiting-factor reason_code explaining why the claim is false.
+  Otherwise pick exactly one limiting-factor reason_code
+  explaining why the claim is false.
 
 Precedence if multiple apply:
-OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION > LIGHTING_DISTANCE > AUGMENTED_VISION_REQUIRED > INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT > MULTI_AGENT_SECOND_ORDER
 
-Transparent clear glass is non-occluding; frosted/translucent counts as occluding for recognition.
+  OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION
+  > LIGHTING_DISTANCE > AUGMENTED_VISION_REQUIRED
+  > INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT
+  > MULTI_AGENT_SECOND_ORDER
+
+Transparent clear glass is non-occluding;
+frosted/translucent counts as occluding for recognition.
 
 Confidence
 
-Confidence is your probability that your chosen label is correct (0.0 to 1.0).
+Confidence is your probability that your chosen label is
+correct (0.0 to 1.0).
 
-Use your own internal thresholding. If you cannot decide with reasonable confidence, choose ABSTAIN.
+Use your own internal thresholding. If you cannot decide
+with reasonable confidence, choose ABSTAIN.
 
 Question: {question}
 \end{Verbatim}
@@ -748,7 +776,7 @@ We introduced \benchmarkname{}, a benchmark for visibility and perspective reaso
 
 \begin{itemize}[noitemsep, topsep=3pt]
   \item \textbf{Models:} Gemini 3.1 Pro, GPT-5, Claude Opus 4.5, GPT-4o, Gemini 2.5 Pro, Claude 3.7 Sonnet, Gemma 3 12B, InternVL3-8B, Qwen3-VL-8B.
-  \item \textbf{API call dates:} All closed-source model runs were completed between January and March 2026. Exact dates are recorded in the released run metadata.
+  \item \textbf{API call dates:} All closed-source model runs were completed between January and March 2026. Exact dates and model version strings (API model IDs) are recorded in the released run metadata.
   \item \textbf{Temperature:} Default API temperature for all models (no manual override).
   \item \textbf{Image resolution:} Images were sent at their original resolution (3024$\times$4032) to closed-source APIs. Open-source models applied their default internal resizing.
   \item \textbf{Retry policy:} Failed API calls (timeouts, rate limits) were retried up to 3 times with exponential backoff. No retries were made based on output content.
