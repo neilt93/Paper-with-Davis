@@ -18,6 +18,7 @@
 \usepackage{float}
 \usepackage{subcaption}
 \usepackage{fvextra}
+\usepackage{listings}
 \usepackage{microtype}
 
 \hypersetup{
@@ -36,6 +37,21 @@
 \emergencystretch=2em
 \fvset{breaklines=true,breakanywhere=true}
 \captionsetup{font=small}
+
+% Clean verbatim listings (no wrap markers)
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  breaklines=true,
+  breakatwhitespace=false,
+  postbreak={},
+  prebreak={},
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=0pt,
+  frame=none,
+  aboveskip=\smallskipamount,
+  belowskip=\smallskipamount
+}
 
 \newcommand{\benchmarkname}{\textsc{VB}}
 \newcommand{\benchlong}{Visibility Benchmark}
@@ -294,11 +310,12 @@ Reason codes make failures more actionable and more interpretable. They help dis
 \paragraph{Choosing a single code.}
 If multiple limiting factors apply, we use the following precedence to select one:
 \begin{quote}
-\begin{Verbatim}[fontsize=\small,breaklines=true]
-OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION > LIGHTING_DISTANCE >
-AUGMENTED_VISION_REQUIRED > INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT >
-MULTI_AGENT_SECOND_ORDER
-\end{Verbatim}
+\begin{lstlisting}[basicstyle=\small\ttfamily]
+OCCLUSION > OUT_OF_FRAME > GAZE_DIRECTION
+> LIGHTING_DISTANCE > AUGMENTED_VISION_REQUIRED
+> INHERENTLY_NONVISUAL > INSUFFICIENT_CONTEXT
+> MULTI_AGENT_SECOND_ORDER
+\end{lstlisting}
 \end{quote}
 The same precedence is included in the evaluation prompt in Section~\ref{sec:prompt}.
 
@@ -520,7 +537,7 @@ We used a single, explicit instruction block (provided as the user message) to s
 The prompt is shown verbatim below, with \texttt{\{question\}} substituted per item.
 
 \begin{quote}
-\begin{Verbatim}[fontsize=\footnotesize,breaklines=false,commandchars=none]
+\begin{lstlisting}
 You are given one photo and one question. Decide whether the
 question's claim is true using only pixels in this photo.
 Do not guess and do not use world knowledge.
@@ -548,10 +565,10 @@ If the question uses pronouns or vague references, you must
 be able to identify the referent unambiguously from the image
 plus the question text alone.
 
-Acceptable disambiguation: only one plausible referent exists,
-or the question uniquely specifies it via clear visual
-descriptors (eg "the man on the left", "the woman in the red
-jacket", "the cat on the sofa").
+Acceptable disambiguation: only one plausible referent
+exists, or the question uniquely specifies it via clear
+visual descriptors (eg "the man on the left", "the woman
+in the red jacket", "the cat on the sofa").
 
 If multiple referents are plausible and the text does not
 uniquely pick one, choose ABSTAIN with
@@ -615,7 +632,7 @@ Use your own internal thresholding. If you cannot decide
 with reasonable confidence, choose ABSTAIN.
 
 Question: {question}
-\end{Verbatim}
+\end{lstlisting}
 \end{quote}
 
 \section{Experimental setup}
