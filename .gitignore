@@ -46,6 +46,7 @@ Thumbs.db
 *.log
 
 Sheets/**/*.csv
+Sheets/**/*.bak
 Sheets/**/*.xlsx
 Sheets/**/*.json
 Sheets/**/*.txt
@@ -56,6 +57,13 @@ Sheets/**/*.err.log
 Sheets/**/*.out.log
 Sheets/**/*.err.log.gz
 Sheets/**/*.out.log.gz
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.out
+paper/page_*.png
 
 # Large binary archives
 Images.zip

@@ -4,14 +4,25 @@ This repository contains the dataset, evaluation code, and paper source for **VB
 
 ## Paper
 
-The paper is located in [`paper/main.tex`](./paper/main.tex) and can be built with `pdflatex`/`bibtex`. It evaluates **10 vision-language models** (4 flagship closed-source, 3 prior-generation closed-source, 3 open-source 8--12B) across 100 families using a 2x2 XOR design (300 headline evaluation cells per model). Key findings:
+The paper is located in [`paper/main.tex`](./paper/main.tex) and can be built with `pdflatex`/`bibtex`. It evaluates **9 vision-language models** (3 flagship closed-source, 3 prior-generation closed-source, 3 open-source 8--12B) across 100 families using a 2x2 XOR design (300 headline evaluation cells per model). Key findings:
 
-- **Gemini 3.1 Pro** achieves the best composite score (0.727), followed by Gemini 3 Pro (0.679) and GPT-5 (0.656)
-- **Gemma 3 12B** is the best open-source model (0.505), surpassing two prior-generation closed-source systems
-- Text-flip robustness exceeds image-flip robustness for 7/10 models
+- **GPT-4o** achieves the best composite score (0.728), followed by Gemini 3.1 Pro (0.727) and Gemini 2.5 Pro (0.678)
+- **Gemma 3 12B** is the best open-source model (0.505), surpassing one prior-generation closed-source system
+- Text-flip robustness exceeds image-flip robustness for 6/9 models
 - Confidence calibration varies substantially across models
 
 Models are scored on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc).
+
+## Installation
+
+```bash
+git clone https://github.com/<your-org>/visibility-benchmark.git
+cd visibility-benchmark
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env        # then fill in your API keys
+```
 
 ## Overview
 
@@ -45,7 +56,7 @@ For `scripts/local/run_visibility_eval.py`, the input table should (at minimum) 
 - `flip_question` – the text-flipped question (typically the strict negation of `base_question`).
 - `base_label` – optional. In the XOR dataset we assume BASE is always `NOT_VISIBLE`, so scoring does not require this column.
 
-You can keep using your existing sheets; you don’t need to rewrite paths by hand.
+You can keep using your existing sheets; you don't need to rewrite paths by hand.
 
 #### How image paths are resolved
 
@@ -83,20 +94,18 @@ From the repo root:
 
 ```bash
 # Full run: evaluate every row with Status == 'Done' for this model
-python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt
+python scripts/local/run_visibility_eval.py --input "Sheets/FINAL_Pictures_DB.csv" --model gpt
 
 # Incremental run: only fill in rows where this model's outputs are still empty
-python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt --only-missing
-
-# You can also point directly at an Excel sheet
-python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.xlsx" --model gpt
+python scripts/local/run_visibility_eval.py --input "Sheets/FINAL_Pictures_DB.csv" --model gpt --only-missing
 ```
 
 Under the hood, `--model` can be:
 
 - `gpt` – OpenAI GPT-4 vision (expects `OPENAI_API_KEY` in your env),
-- `gemini` – Google Gemini 1.5 Pro (expects `GEMINI_API_KEY`),
-- `llava-onevision`, `qwen-vl`, `idefics2` – three strong local vision models wired up via Hugging Face, or
+- `gemini` – Google Gemini Pro (expects `GEMINI_API_KEY`),
+- `claude` – Anthropic Claude (expects `ANTHROPIC_API_KEY`),
+- `llava`, `qwen`, `llama` – local vision models via Hugging Face (expects `HF_TOKEN`), or
 - any valid HF repo id for a local vision model.
 
 ### What you get back
@@ -114,39 +123,10 @@ and adds four columns (the XOR 2×2):
 
 Each cell contains the raw JSON/text from the model for that (image, question) pair, or an `ERROR: ...` message if something went wrong on that row.
 
-If you’d rather get an Excel file directly, just give `--out` an `.xlsx` path, for example:
+### Scoring
 
 ```bash
-python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.xlsx" --model gpt --out "Sheets/11-14-25.gpt.vlm.xlsx"
-```
-
-### Optional: Google Sheets integration (two-stage)
-
-If your source of truth is a Google Sheet (like:
-`https://docs.google.com/spreadsheets/d/1-DxRkbEPVvkjCMKDjl8k3tTkFU2FdQ5pr0w6PEuaCmI/...`),
-you can treat the cloud sheet as the front-end and this repo as the engine.
-
-#### Stage 1 – Pull the current sheet down
-
-```bash
-python scripts/cloud/pull_from_sheets.py \
-  --spreadsheet-id "1-DxRkbEPVvkjCMKDjl8k3tTkFU2FdQ5pr0w6PEuaCmI" \
-  --input-sheet "11-14-25"
-```
-
-- This will create `Sheets/11-14-25.csv` locally (by default).
-- It uses the service-account JSON you pointed to via `GOOGLE_APPLICATION_CREDENTIALS`.
-
-#### Stage 2 – Run eval locally
-
-```bash
-python scripts/local/run_visibility_eval.py --input "Sheets/11-14-25.csv" --model gpt
-```
-
-#### Stage 2b – Score the run (XOR metrics)
-
-```bash
-python scripts/scoring/score_vlm_run.py --input "Sheets/11-14-25.gpt.vlm.csv" --model gpt --side xor
+python scripts/scoring/score_vlm_run.py --input "Sheets/FINAL_Pictures_DB.gpt.vlm.csv" --model gpt --side xor --strict-3cell
 ```
 
 Notes:
@@ -156,19 +136,19 @@ Notes:
 - ToM items are derived from IDs matching `^MA-` (no extra column needed).
 - Use `--strict-3cell` (default) to require the 3 headline cells to be parsable for a family to enter MEFR denominators. You can relax with `--no-strict-3cell`.
 
-#### Stage 3 – Push the results back as a new tab
+## Citation
 
-```bash
-python scripts/cloud/push_to_sheets.py \
-  --spreadsheet-id "1-DxRkbEPVvkjCMKDjl8k3tTkFU2FdQ5pr0w6PEuaCmI" \
-  --input "Sheets/11-14-25.gpt.vlm.csv" \
-  --sheet-name "11-14-25.gpt" \
-  --with-timestamp
+If you use the VB benchmark in your research, please cite:
+
+```bibtex
+@article{tripathi_vb_2026,
+  author  = {Neil Tripathi},
+  title   = {{VB}: Visibility Benchmark for Visibility and Perspective Reasoning in Images},
+  year    = {2026},
+  note    = {Available at \url{https://github.com/<your-org>/visibility-benchmark}}
+}
 ```
 
-- This will create (or overwrite) a tab named something like
-  `11-14-25.gpt.2025-11-25_1530` inside the same spreadsheet, containing your original columns plus the four XOR output columns:
-  `gpt_I0q0_json`, `gpt_I0q1_json`, `gpt_I1q0_json`, `gpt_I1q1_json`.
+## License
 
-That will read your existing Excel sheet, run the eval, and write a new `.xlsx` with all the original columns plus the new model output columns, so you can open it straight in Excel or Google Sheets.
-
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.

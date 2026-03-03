@@ -66,7 +66,7 @@
 \maketitle
 
 \begin{abstract}
-We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. Unlike prior unanswerable-VQA benchmarks, \benchmarkname{} tests not only \emph{whether} a question is unanswerable but \emph{why} (via reason codes tied to specific visibility factors), and uses controlled minimal edits to verify that model judgments change when and only when the underlying evidence changes. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc). We evaluate nine models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. GPT-4o and Gemini 3.1 Pro tie for the best composite score (0.728 and 0.727), followed by Gemini 2.5 Pro (0.678). The best open-source model, Gemma 3 12B (0.505), surpasses one prior-generation closed-source system. Text-flip robustness exceeds image-flip robustness for six of nine models, and confidence calibration varies substantially---GPT-4o and Gemini 2.5 Pro achieve similar accuracy yet differ sharply in selective prediction quality.
+We present \benchmarkname, a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer. Each item pairs a single photo with a short yes/no visibility claim; the model must output \texttt{VISIBLY\_TRUE}, \texttt{VISIBLY\_FALSE}, or \texttt{ABSTAIN}, together with a confidence score. Items are organized into 100 families using a \(2 \times 2\) design that crosses a minimal image edit with a minimal text edit, yielding 300 headline evaluation cells. Unlike prior unanswerable-VQA benchmarks, \benchmarkname{} tests not only \emph{whether} a question is unanswerable but \emph{why} (via reason codes tied to specific visibility factors), and uses controlled minimal edits to verify that model judgments change when and only when the underlying evidence changes. We score models on confidence-aware accuracy with abstention (CAA), minimal-edit flip rate (MEFR), confidence-ranked selective prediction (SelRank), and second-order perspective reasoning (ToMAcc); all headline numbers are computed on the strict XOR subset (three cells per family, 300 scored items per model). We evaluate nine models spanning flagship and prior-generation closed-source systems, and open-source models from 8B to 12B parameters. GPT-4o and Gemini 3.1 Pro tie for the best composite score (0.728 and 0.727), followed by Gemini 2.5 Pro (0.678). The best open-source model, Gemma 3 12B (0.505), surpasses one prior-generation closed-source system. Text-flip robustness exceeds image-flip robustness for six of nine models, and confidence calibration varies substantially---GPT-4o and Gemini 2.5 Pro achieve similar accuracy yet differ sharply in selective prediction quality.
 \end{abstract}
 
 \section{Introduction}
@@ -103,10 +103,7 @@ This paper makes four contributions:
 \benchmarkname{} is not a general VQA benchmark. It deliberately isolates a single skill---deciding whether a short visibility claim is supported by the pixels in one photograph---and measures that skill under controlled perturbations. The tight scope is by design: it enables the \(2\times 2\) construction that makes flip-rate and calibration analyses meaningful, at the cost of not covering open-ended reasoning, multi-image comparison, or long-form answers.
 
 \paragraph{Data release.}
-The full dataset, metadata, and evaluation code are released at:
-\begin{center}
-\url{https://github.com/neilt93/Paper-with-Davis}
-\end{center}
+The full dataset, metadata, and evaluation code are released at the repository linked below.\footnote{\url{https://github.com/neilt93/Paper-with-Davis}}
 
 \section{Qualitative examples}
 \label{sec:examples}
@@ -545,8 +542,16 @@ Acceptable disambiguation: only one plausible referent exists, or the question u
 If multiple referents are plausible and the text does not uniquely pick one, choose ABSTAIN with reason_code=INSUFFICIENT_CONTEXT.
 
 Output format
-Return exactly one minified JSON object (no prose, no markdown, no trailing commas) with keys in this order:
-{"label":"VISIBLY_TRUE|VISIBLY_FALSE|ABSTAIN","reason_code":"GAZE_DIRECTION|OCCLUSION|OUT_OF_FRAME|LIGHTING_DISTANCE|INHERENTLY_NONVISUAL|AUGMENTED_VISION_REQUIRED|INSUFFICIENT_CONTEXT|MULTI_AGENT_SECOND_ORDER|NONE","confidence":number}
+Return exactly one JSON object (no prose, no markdown, no trailing commas) with keys in this order:
+{
+  "label": "VISIBLY_TRUE | VISIBLY_FALSE | ABSTAIN",
+  "reason_code": "GAZE_DIRECTION | OCCLUSION | OUT_OF_FRAME
+                 | LIGHTING_DISTANCE | INHERENTLY_NONVISUAL
+                 | AUGMENTED_VISION_REQUIRED
+                 | INSUFFICIENT_CONTEXT
+                 | MULTI_AGENT_SECOND_ORDER | NONE",
+  "confidence": <number 0.0--1.0>
+}
 
 Label meanings
 

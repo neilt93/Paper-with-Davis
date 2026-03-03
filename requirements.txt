@@ -1,0 +1,18 @@
+# Core
+pandas
+pillow
+python-dotenv
+numpy
+scipy
+
+# API models
+openai
+google-genai
+anthropic
+
+# Local models (optional – requires CUDA GPU)
+# torch
+# torchvision
+# transformers
+# accelerate
+# huggingface_hub
