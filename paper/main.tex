@@ -100,165 +100,129 @@ The full dataset, metadata, and evaluation code are released at:
 \section{Qualitative examples}
 \label{sec:examples}
 
-Figure~\ref{fig:family_2x2_example} illustrates the \(2 \times 2\) family construction. It reuses two images (\(I^0\) and \(I^1\)) and two questions (\(q^0\) and \(q^1\)) to yield four evaluated cells. If the referenced image files are not present locally, the document will display explicit placeholders instead of failing to compile.
-
-\begin{figure}[p]
-  \centering
-  \small
-  \caption{A single family shown in the full \texorpdfstring{$2\times 2$}{2x2} layout. This figure uses two images and two questions, repeated across cells. To reproduce the figure, copy the corresponding files into \texttt{figs/examples/} using the filenames in the \texttt{\textbackslash maybeincludegraphics} calls.}
-  \label{fig:family_2x2_example}
-
-  \textbf{Family AV-04 (distance/readability).}
-  \begin{subfigure}[t]{0.24\textwidth}
-    \centering
-    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_base.jpeg}{\linewidth}
-    \caption{\textbf{BASE} \((I^0,q^0)\).\\
-    \textbf{Q:} ``Can you read the small text on the laptop?''\\
-    \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
-  \end{subfigure}\hfill
-  \begin{subfigure}[t]{0.24\textwidth}
-    \centering
-    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_base.jpeg}{\linewidth}
-    \caption{\textbf{TEXT\_FLIP} \((I^0,q^1)\).\\
-    \textbf{Q:} ``Can you not read the small text on the laptop?''\\
-    \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
-  \end{subfigure}\hfill
-  \begin{subfigure}[t]{0.24\textwidth}
-    \centering
-    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_flip.jpeg}{\linewidth}
-    \caption{\textbf{IMAGE\_FLIP} \((I^1,q^0)\).\\
-    \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
-  \end{subfigure}\hfill
-  \begin{subfigure}[t]{0.24\textwidth}
-    \centering
-    \maybeincludegraphics[angle=90,origin=c]{figs/examples/AV-04_flip.jpeg}{\linewidth}
-    \caption{\textbf{DOUBLE\_FLIP} \((I^1,q^1)\).\\
-    \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
-  \end{subfigure}
-\end{figure}
-
 Figure~\ref{fig:category_examples} shows one representative base/flip pair per primary category. Each pair uses the base question \(q^0\) and displays the base image \(I^0\) and the minimally edited image \(I^1\) (the IMAGE\_FLIP cell). For space, we omit the corresponding text-edited question \(q^1\) and the DOUBLE\_FLIP cell, but every family in the released benchmark includes all four cells \((I^a,q^b)\) for \(a,b \in \{0,1\}\) (Section~\ref{subsec:xor}).
 
 \begin{figure}[p]
   \centering
-  \small
-  \caption{Representative base/flip examples (one family per primary category). Each pair shows the BASE cell \((I^0,q^0)\) and the IMAGE\_FLIP cell \((I^1,q^0)\). Most shown pairs are from the strict XOR headline subset, where BASE is \texttt{VISIBLY\_FALSE} and IMAGE\_FLIP is \texttt{VISIBLY\_TRUE} by construction (Section~\ref{subsec:xor}). The INSUFFICIENT\_CONTEXT pair illustrates a case where the correct label is \texttt{ABSTAIN}.}
+  \scriptsize
+  \captionsetup{font=scriptsize}
+  \caption{Representative base/flip examples (one family per primary category). Each pair shows the BASE cell \((I^0,q^0)\) and IMAGE\_FLIP cell \((I^1,q^0)\). Most pairs follow the strict XOR pattern: BASE is \texttt{VF} and IMAGE\_FLIP is \texttt{VT}. The IC pair illustrates \texttt{ABSTAIN}. (\texttt{VT}=\texttt{VISIBLY\_TRUE}, \texttt{VF}=\texttt{VISIBLY\_FALSE}.)}
   \label{fig:category_examples}
 
   % Row 1: LD and OF
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1121.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1121.jpeg}{\linewidth}
   \caption{\textbf{LD-02 BASE.}\\
   \textbf{Q:} ``Is the sign text clearly readable in this photo?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1122.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1122.jpeg}{\linewidth}
   \caption{\textbf{LD-02 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0673.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0673.jpeg}{\linewidth}
   \caption{\textbf{OF-13 BASE.}\\
-  \textbf{Q:} ``Is the microwave visible in this photo?''\\
+  \textbf{Q:} ``Is the laundry basket visible in this photo?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0674.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0674.jpeg}{\linewidth}
   \caption{\textbf{OF-13 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}
 
-\vspace{6pt}
+\vspace{2pt}
 
 % Row 2: OC and GD
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0268.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0268.jpeg}{\linewidth}
   \caption{\textbf{OC-11 BASE.}\\
   \textbf{Q:} ``Is the room number clearly visible in this photo?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0269.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0269.jpeg}{\linewidth}
   \caption{\textbf{OC-11 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0976.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0976.jpeg}{\linewidth}
   \caption{\textbf{GD-06 BASE.}\\
   \textbf{Q:} ``Is he clearly looking at the laptop screen?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0983.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0983.jpeg}{\linewidth}
   \caption{\textbf{GD-06 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}
 
-\vspace{6pt}
+\vspace{2pt}
 
 % Row 3: AV and NV
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0618.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0618.jpeg}{\linewidth}
   \caption{\textbf{AV-01 BASE.}\\
   \textbf{Q:} ``Is the building number clearly readable in this photo?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0619.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0619.jpeg}{\linewidth}
   \caption{\textbf{AV-01 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1107.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1107.jpeg}{\linewidth}
   \caption{\textbf{NV-08 BASE.}\\
   \textbf{Q:} ``Is the song title/track info visible in this photo (screen/now playing)?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1108.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1108.jpeg}{\linewidth}
   \caption{\textbf{NV-08 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}
 
-\vspace{6pt}
+\vspace{2pt}
 
 % Row 4: IC and MA/SO
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1115.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1115.jpeg}{\linewidth}
   \caption{\textbf{IC-05 BASE.}\\
   \textbf{Q:} ``Is the correct mailbox clearly identifiable in this photo?''\\
   \textbf{Gold:} \texttt{ABSTAIN}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_1116.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_1116.jpeg}{\linewidth}
   \caption{\textbf{IC-05 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0883.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0883.jpeg}{\linewidth}
   \caption{\textbf{MA-06 BASE.}\\
   \textbf{Q:} ``Is he clearly looking at what she is pointing to?''\\
   \textbf{Gold:} \texttt{VISIBLY\_FALSE}.}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.24\textwidth}
   \centering
-  \maybeincludegraphics[angle=-90,origin=c]{figs/examples/IMG_0886.jpeg}{\linewidth}
+  \maybeincludegraphics[height=0.15\textheight,keepaspectratio]{figs/examples/IMG_0886.jpeg}{\linewidth}
   \caption{\textbf{MA-06 IMAGE\_FLIP.}\\
   \textbf{Gold:} \texttt{VISIBLY\_TRUE}.}
 \end{subfigure}
@@ -733,7 +697,7 @@ Visibility reasoning is a prerequisite for safe image-grounded behavior, and the
 We introduced \benchmarkname{}, a benchmark for visibility and perspective reasoning in images with a controlled \(2 \times 2\) family construction, explicit abstention, and a dedicated MULTI\_AGENT / SECOND\_ORDER slice. We evaluate nine vision-language models across 100 families. GPT-4o and Gemini 3.1 Pro achieve the highest composite scores, while the best open-source model (Gemma 3 12B) surpasses one prior-generation closed-source system, demonstrating that visibility reasoning capabilities are beginning to transfer to the open-source tier at the 8--12B scale. Future work will expand the benchmark with additional families, a larger SECOND\_ORDER slice, and images from broader environments to strengthen statistical power and generalizability.
 
 \section*{Acknowledgements}
-I thank Ernest Davis for detailed feedback on benchmark design, paper presentation, and evaluation methodology.
+I thank Prof.\ Ernest Davis of New York University (davise@cs.nyu.edu) for detailed feedback on benchmark design, paper presentation, and evaluation methodology.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
