@@ -121,7 +121,7 @@ This paper makes four contributions:
 \benchmarkname{} is not a general VQA benchmark. It deliberately isolates a single skill---deciding whether a short visibility claim is supported by the pixels in one photograph---and measures that skill under controlled perturbations. The tight scope is by design: it enables the \(2\times 2\) construction that makes flip-rate and calibration analyses meaningful, at the cost of not covering open-ended reasoning, multi-image comparison, or long-form answers.
 
 \paragraph{Data release.}
-The full dataset, metadata, and evaluation code are released at the repository linked below.\footnote{\url{https://github.com/neilt93/Paper-with-Davis}}
+The full dataset, metadata, and evaluation code are released at the repository linked below.\footnote{\url{https://github.com/neilt93/VB}}
 
 \section{Qualitative examples}
 \label{sec:examples}
@@ -801,7 +801,7 @@ We introduced \benchmarkname{}, a benchmark for visibility and perspective reaso
   \item \textbf{Retry policy:} Failed API calls (timeouts, rate limits) were retried up to 3 times with exponential backoff. No retries were made based on output content.
   \item \textbf{Open-source hardware:} Single NVIDIA RTX 3090 (24\,GB VRAM) via RunPod.
   \item \textbf{Prompt:} Verbatim in Section~\ref{sec:prompt}; identical across all models.
-  \item \textbf{Code and data:} Released at \url{https://github.com/neilt93/Paper-with-Davis}.
+  \item \textbf{Code and data:} Released at \url{https://github.com/neilt93/VB}.
 \end{itemize}
 
 \section*{Acknowledgements}

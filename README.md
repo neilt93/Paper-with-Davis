@@ -1,5 +1,7 @@
 # VB: Visibility Benchmark for Vision-Language Models
 
+[![arXiv](https://img.shields.io/badge/arXiv-2603.06680-b31b1b.svg)](https://arxiv.org/abs/2603.06680)
+
 This repository contains the dataset, evaluation code, and paper source for **VB** (Visibility Benchmark), a benchmark that tests whether vision-language models can determine what is and is not visible in a photograph---and abstain when a human viewer cannot reliably answer.
 
 ## Paper
@@ -16,8 +18,8 @@ Models are scored on confidence-aware accuracy with abstention (CAA), minimal-ed
 ## Installation
 
 ```bash
-git clone https://github.com/<your-org>/visibility-benchmark.git
-cd visibility-benchmark
+git clone https://github.com/neilt93/VB.git
+cd VB
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -141,11 +143,12 @@ Notes:
 If you use the VB benchmark in your research, please cite:
 
 ```bibtex
-@article{tripathi_vb_2026,
-  author  = {Neil Tripathi},
+@article{tripathi2026vb,
   title   = {{VB}: Visibility Benchmark for Visibility and Perspective Reasoning in Images},
+  author  = {Neil Tripathi},
+  journal = {arXiv preprint arXiv:2603.06680},
   year    = {2026},
-  note    = {Available at \url{https://github.com/<your-org>/visibility-benchmark}}
+  url     = {https://arxiv.org/abs/2603.06680}
 }
 ```
 
